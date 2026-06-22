@@ -1,0 +1,245 @@
+@page "/admin/inventario"
+@inject CineFlow.Web.Servicios.User.UserState UserState
+@inject NavigationManager NavigationManager
+
+<PageTitle>Gestión de Inventario - Admin</PageTitle>
+
+@if (!IsAdmin)
+{
+    <div class="alert alert-danger m-5">Acceso denegado. No tienes permisos para ver esta página.</div>
+}
+else
+{
+    <div class="min-h-screen bg-background">
+      <div class="max-w-7xl mx-auto px-4 py-8">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 class="text-2xl text-foreground mb-2" style="font-size: 1.5rem; font-weight:bold;">Gestión de Inventario</h1>
+            <p class="text-muted-foreground" style="color:gray;">Control de stock y reabastecimiento de confitería</p>
+          </div>
+        </div>
+
+        <div class="bg-card rounded-lg shadow-sm border border-border p-6 mb-8">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="text-body fw-semibold small mb-1"><i class="bi bi-search text-primary me-1"></i>Buscar Artículo</label>
+              <input type="text" placeholder="Ej. Popcorn..." class="form-control bg-body-tertiary text-body border-secondary" @bind="searchTerm" @bind:event="oninput" />
+            </div>
+            <div class="col-md-3">
+              <label class="text-body fw-semibold small mb-1"><i class="bi bi-funnel text-primary me-1"></i>Categoría</label>
+              <select class="form-select bg-body-tertiary text-body border-secondary" @bind="categoriaFiltro">
+                <option value="Todas">Todas</option>
+                <option value="Snack">Snacks</option>
+                <option value="Bebida">Bebidas</option>
+                <option value="Combo">Combos</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="text-body fw-semibold small mb-1"><i class="bi bi-calendar-range text-primary me-1"></i>Última Reposición</label>
+              <select class="form-select bg-body-tertiary text-body border-secondary" @bind="periodoFiltro">
+                <option value="Todos">Cualquier fecha</option>
+                <option value="Dias">Últimos 7 días</option>
+                <option value="Meses">Último mes</option>
+                <option value="Anios">Último año</option>
+              </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button class="btn btn-outline-danger w-100" @onclick="LimpiarFiltros">
+                <i class="bi bi-x-circle me-1"></i> Quitar Filtros
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="bg-card rounded-lg shadow-lg border border-border overflow-hidden">
+          <div class="p-6 border-b border-border flex items-center justify-between">
+            <h2 class="text-lg text-foreground" style="font-size: 1.25rem; font-weight:bold;">Inventario Actual</h2>
+            <button class="flex items-center gap-2 px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90 transition-colors" @onclick="ExportarCSV">
+              <i class="bi bi-download"></i>
+              Exportar
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead class="bg-muted/30">
+                <tr>
+                  <th class="px-6 py-3 text-left text-sm text-foreground">Artículo</th>
+                  <th class="px-6 py-3 text-left text-sm text-foreground">Categoría</th>
+                  <th class="px-6 py-3 text-right text-sm text-foreground">Stock actual</th>
+                  <th class="px-6 py-3 text-right text-sm text-foreground">Stock mínimo</th>
+                  <th class="px-6 py-3 text-left text-sm text-foreground">Última reposición</th>
+                  <th class="px-6 py-3 text-center text-sm text-foreground">Estado</th>
+                  <th class="px-6 py-3 text-center text-sm text-foreground">Acciones</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-border">
+                @foreach (var item in InventarioFiltrado)
+                {
+                    bool esBajoStock = item.StockActual <= item.StockMinimo;
+                  <tr class="hover:bg-muted/20">
+                    <td class="px-6 py-4 text-sm text-foreground">@item.Articulo</td>
+                    <td class="px-6 py-4 text-sm text-muted-foreground">@item.Categoria</td>
+                    <td class="px-6 py-4 text-sm text-foreground text-right font-bold @(esBajoStock ? "text-danger" : "text-success")">
+                      @item.StockActual
+                    </td>
+                    <td class="px-6 py-4 text-sm text-muted-foreground text-right">@item.StockMinimo</td>
+                    <td class="px-6 py-4 text-sm text-muted-foreground">@item.UltimaReposicion.ToString("dd/MM/yyyy")</td>
+                    <td class="px-6 py-4 text-center">
+                        @if (esBajoStock)
+                        {
+                            <span class="px-2 py-1 bg-danger text-white text-xs rounded d-inline-flex align-items-center gap-1">
+                                <i class="bi bi-exclamation-triangle"></i> Bajo Stock
+                            </span>
+                        }
+                        else
+                        {
+                            <span class="px-2 py-1 bg-success text-white text-xs rounded">Normal</span>
+                        }
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                      <div class="flex items-center justify-center gap-2">
+                        <button class="p-1.5 bg-success text-white rounded hover:bg-success/80 transition-colors" title="Registrar Ingreso" @onclick="() => AbrirModal(item, true)">
+                          <i class="bi bi-plus-lg"></i>
+                        </button>
+                        <button class="p-1.5 bg-danger text-white rounded hover:bg-danger/80 transition-colors" title="Registrar Egreso" @onclick="() => AbrirModal(item, false)">
+                          <i class="bi bi-dash-lg"></i>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    @if (modalAbierto)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-dialog-centered text-body">
+                <div class="modal-content bg-card">
+                    <div class="modal-header border-border">
+                        <h5 class="modal-title fw-bold text-foreground">
+                            @(esIngreso ? "Registrar Ingreso" : "Registrar Egreso") - @itemSeleccionado?.Articulo
+                        </h5>
+                        <button type="button" class="btn-close" @onclick="CerrarModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label text-body">Cantidad</label>
+                            <input type="number" min="1" class="form-control bg-body-tertiary text-body border-secondary" @bind="cantidad" />
+                        </div>
+                    </div>
+                    <div class="modal-footer border-border">
+                        <button type="button" class="btn btn-secondary" @onclick="CerrarModal">Cancelar</button>
+                        <button type="button" class="btn btn-danger" @onclick="GuardarStock">Confirmar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private bool IsAdmin => UserState.IsLoggedIn && UserState.Email.Equals("admin@cineflow.com", StringComparison.OrdinalIgnoreCase);
+
+    private class MockInv
+    {
+        public string Articulo { get; set; } = "";
+        public string Categoria { get; set; } = "";
+        public int StockActual { get; set; }
+        public int StockMinimo { get; set; }
+        public DateTime UltimaReposicion { get; set; }
+    }
+
+    private List<MockInv> inventario = new()
+    {
+        new MockInv { Articulo = "Popcorn Gigante", Categoria = "Snack", StockActual = 150, StockMinimo = 50, UltimaReposicion = DateTime.Now.AddDays(-2) },
+        new MockInv { Articulo = "Gaseosa Grande", Categoria = "Bebida", StockActual = 40, StockMinimo = 50, UltimaReposicion = DateTime.Now.AddDays(-5) },
+        new MockInv { Articulo = "Nachos con Queso", Categoria = "Snack", StockActual = 15, StockMinimo = 20, UltimaReposicion = DateTime.Now.AddDays(-10) }
+    };
+
+    private string searchTerm = "";
+    private string categoriaFiltro = "Todas";
+    private string periodoFiltro = "Todos";
+
+    private IEnumerable<MockInv> InventarioFiltrado => inventario.Where(i => 
+        (string.IsNullOrWhiteSpace(searchTerm) || i.Articulo.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) &&
+        (categoriaFiltro == "Todas" || i.Categoria == categoriaFiltro) &&
+        FiltroPorFecha(i.UltimaReposicion)
+    );
+
+    private bool FiltroPorFecha(DateTime fecha)
+    {
+        var hoy = DateTime.Now;
+        return periodoFiltro switch
+        {
+            "Dias" => (hoy - fecha).TotalDays <= 7,
+            "Meses" => (hoy - fecha).TotalDays <= 31,
+            "Anios" => (hoy - fecha).TotalDays <= 365,
+            _ => true
+        };
+    }
+
+    private void LimpiarFiltros()
+    {
+        searchTerm = "";
+        categoriaFiltro = "Todas";
+        periodoFiltro = "Todos";
+    }
+
+    private bool modalAbierto = false;
+    private bool esIngreso = false;
+    private MockInv? itemSeleccionado;
+    private int cantidad = 1;
+
+    private void AbrirModal(MockInv item, bool ingreso)
+    {
+        itemSeleccionado = item;
+        esIngreso = ingreso;
+        cantidad = 1;
+        modalAbierto = true;
+    }
+
+    private void CerrarModal() => modalAbierto = false;
+
+    private void GuardarStock()
+    {
+        if (itemSeleccionado != null && cantidad > 0)
+        {
+            if (esIngreso)
+            {
+                itemSeleccionado.StockActual += cantidad;
+                itemSeleccionado.UltimaReposicion = DateTime.Now;
+            }
+            else
+            {
+                itemSeleccionado.StockActual = Math.Max(0, itemSeleccionado.StockActual - cantidad);
+            }
+        }
+        CerrarModal();
+    }
+
+    [Inject] private IJSRuntime JSRuntime { get; set; } = default!;
+
+    private async Task ExportarCSV()
+    {
+        var csv = "Artículo,Categoría,Stock Actual,Stock Mínimo,Última Reposición\n";
+        foreach (var item in inventario)
+        {
+            csv += $"\"{item.Articulo}\",\"{item.Categoria}\",{item.StockActual},{item.StockMinimo},{item.UltimaReposicion:yyyy-MM-dd}\n";
+        }
+        await JSRuntime.InvokeVoidAsync("downloadFile", "Inventario.csv", csv);
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && !IsAdmin)
+        {
+            NavigationManager.NavigateTo("/");
+        }
+    }
+}

@@ -1,0 +1,331 @@
+@page "/movies/{MovieId}/seats/{FuncionId}/payment"
+@using CineFlow.Web.Servicios.Reserva
+@using CineFlow.Web.ViewModels.Catalogo
+@using CineFlow.Web.ViewModels.Reserva
+@inject NavigationManager NavigationManager
+@inject BookingState BookingState
+@inject IReservasServiceClient ReservasService
+@inject CineFlow.Web.Servicios.User.UserState UserState
+
+<PageTitle>Pago - CineFlow</PageTitle>
+
+<div class="container py-5">
+    <h2 class="fw-bold mb-4 text-danger">Finaliza tu Compra</h2>
+    
+    <div class="row">
+        <div class="col-md-7">
+            <div class="card shadow-sm border-0 mb-4 bg-white">
+                <div class="card-body p-4">
+                    <h5 class="card-title fw-bold mb-4 text-body"><i class="bi bi-wallet2 me-2 text-danger"></i>Método de Pago</h5>
+                    
+                    <div class="btn-group w-100 mb-4" role="group">
+                        <input type="radio" class="btn-check" name="paymentMethod" id="btnCreditCard" autocomplete="off" checked="@(paymentMethod == "Card")" @onchange="@(() => paymentMethod = "Card")">
+                        <label class="btn btn-outline-danger fw-bold" for="btnCreditCard"><i class="bi bi-credit-card me-2"></i>Tarjeta</label>
+
+                        <input type="radio" class="btn-check" name="paymentMethod" id="btnYape" autocomplete="off" checked="@(paymentMethod == "Yape")" @onchange="@(() => paymentMethod = "Yape")">
+                        <label class="btn btn-outline-primary fw-bold text-dark" for="btnYape" style="background-color: #E2E3E5; border-color: #702b89;"><span style="color: #702b89;"><i class="bi bi-qr-code-scan me-2"></i>Yape</span></label>
+
+                        <input type="radio" class="btn-check" name="paymentMethod" id="btnPlin" autocomplete="off" checked="@(paymentMethod == "Plin")" @onchange="@(() => paymentMethod = "Plin")">
+                        <label class="btn btn-outline-info fw-bold text-dark" for="btnPlin" style="background-color: #E2E3E5; border-color: #00b2e3;"><span style="color: #00b2e3;"><i class="bi bi-qr-code-scan me-2"></i>Plin</span></label>
+                    </div>
+                    
+                    <form @onsubmit="ProcessPayment" @onsubmit.preventDefault="true">
+                        @if (paymentMethod == "Card")
+                        {
+                            <div class="mb-3">
+                                <label class="form-label text-secondary fw-semibold">Número de Tarjeta</label>
+                                <input type="text" class="form-control border-secondary bg-body-tertiary text-body shadow-sm" placeholder="0000 0000 0000 0000" required>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label text-secondary fw-semibold">Fecha de Expiración</label>
+                                    <input type="text" class="form-control border-secondary bg-body-tertiary text-body shadow-sm" placeholder="MM/YY" required>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label text-secondary fw-semibold">CVV</label>
+                                    <input type="text" class="form-control border-secondary bg-body-tertiary text-body shadow-sm" placeholder="123" required>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label text-secondary fw-semibold">Nombre en la Tarjeta</label>
+                                <input type="text" class="form-control border-secondary bg-body-tertiary text-body shadow-sm" placeholder="Juan Pérez" required>
+                            </div>
+                        }
+                        else if (paymentMethod == "Yape")
+                        {
+                            <div class="text-center mb-4">
+                                <h6 class="fw-bold text-dark mb-3">Escanea el QR para pagar con Yape</h6>
+                                <div class="p-3 bg-white rounded shadow-sm d-inline-block border mb-3" style="border-color: #702b89 !important; border-width: 2px !important;">
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg" alt="QR Yape" style="width: 150px; height: 150px;">
+                                </div>
+                                <p class="mb-1 text-secondary">A nombre de: <strong>Nano Banana</strong></p>
+                                <p class="mb-4 fs-5 fw-bold" style="color: #702b89;">999 888 777</p>
+                                
+                                <div class="text-start">
+                                    <label class="form-label text-secondary fw-semibold">Tu Número de Celular (Yape)</label>
+                                    <input type="text" class="form-control border-secondary bg-body-tertiary text-body shadow-sm" placeholder="9XX XXX XXX" required>
+                                </div>
+                            </div>
+                        }
+                        else if (paymentMethod == "Plin")
+                        {
+                            <div class="text-center mb-4">
+                                <h6 class="fw-bold text-dark mb-3">Escanea el QR para pagar con Plin</h6>
+                                <div class="p-3 bg-white rounded shadow-sm d-inline-block border mb-3" style="border-color: #00b2e3 !important; border-width: 2px !important;">
+                                    <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg" alt="QR Plin" style="width: 150px; height: 150px;">
+                                </div>
+                                <p class="mb-1 text-secondary">A nombre de: <strong>Nano Banana</strong></p>
+                                <p class="mb-4 fs-5 fw-bold" style="color: #00b2e3;">999 888 777</p>
+                                
+                                <div class="text-start">
+                                    <label class="form-label text-secondary fw-semibold">Tu Número de Celular (Plin)</label>
+                                    <input type="text" class="form-control border-secondary bg-body-tertiary text-body shadow-sm" placeholder="9XX XXX XXX" required>
+                                </div>
+                            </div>
+                        }
+                        
+                        @if (!string.IsNullOrEmpty(errorMsg))
+                        {
+                            <div class="alert alert-danger mt-3">@errorMsg</div>
+                        }
+
+                        <button type="submit" class="btn btn-danger w-100 fw-bold py-3 fs-5 shadow mt-3" disabled="@(isProcessing || !reservaCreada)">
+                            @if (isProcessing)
+                            {
+                                <span class="spinner-border spinner-border-sm me-2"></span>
+                                <span>Procesando pago...</span>
+                            }
+                            else
+                            {
+                                <span>@(paymentMethod == "Card" ? "Pagar con Tarjeta" : paymentMethod == "Yape" ? "Confirmar Yapeo" : "Confirmar Plin")</span>
+                            }
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-5">
+            <div class="card border-danger shadow-lg bg-white">
+                <div class="card-header bg-danger text-body py-3">
+                    <h5 class="card-title fw-bold m-0"><i class="bi bi-receipt me-2"></i>Resumen del Pedido</h5>
+                </div>
+                <div class="card-body p-4">
+                    @if (Funcion != null)
+                    {
+                        <p class="mb-1 text-dark"><strong>Película:</strong> @Funcion.Pelicula?.Titulo</p>
+                        <p class="mb-1 text-dark"><strong>Cine:</strong> @Funcion.Sala?.Id (Demo)</p>
+                        <p class="mb-3 text-dark"><strong>Fecha:</strong> @Funcion.FechaHora.ToString("dd/MM/yyyy HH:mm")</p>
+                        
+                        <hr class="border-secondary opacity-50" />
+                        
+                        <h6 class="fw-bold text-danger">Entradas (@BookingState.SelectedSeats.Count asientos)</h6>
+                        @foreach (var seatId in BookingState.SelectedSeats)
+                        {
+                            var type = BookingState.TicketTypes.ContainsKey(seatId) ? BookingState.TicketTypes[seatId] : "REGULAR";
+                            double price = type switch {
+                                "NIÑO" => Funcion.PrecioBase * 0.7,
+                                "CONADIS" => Funcion.PrecioBase * 0.5,
+                                _ => Funcion.PrecioBase
+                            };
+                            var asientoLabel = Funcion.MapaAsientos?.FirstOrDefault(a => a.IdAsiento == seatId)?.Label ?? seatId.ToString();
+                            <p class="d-flex justify-content-between text-secondary mb-1">
+                                <span>1 x @type (Asiento @asientoLabel)</span>
+                                <span class="text-dark fw-semibold">S/ @price.ToString("0.00")</span>
+                            </p>
+                        }
+
+                        @if (BookingState.SelectedSnacks.Any())
+                        {
+                            <h6 class="mt-4 fw-bold text-danger">Snacks</h6>
+                            @foreach (var snack in BookingState.SelectedSnacks)
+                            {
+                                var snackDetails = BookingState.AvailableSnacks.FirstOrDefault(s => s.IdItem == snack.Key);
+                                if (snackDetails != null)
+                                {
+                                    <p class="d-flex justify-content-between text-secondary mb-1">
+                                        <span>@snack.Value x @snackDetails.Nombre</span>
+                                        <span class="text-dark fw-semibold">S/ @((snackDetails.PrecioUnitario * snack.Value).ToString("0.00"))</span>
+                                    </p>
+                                }
+                            }
+                        }
+                        
+                        <hr class="border-danger opacity-75 mt-4" />
+                        
+                        <div class="bg-light p-3 rounded d-flex justify-content-between align-items-center border border-danger border-opacity-25 mt-3">
+                            <span class="fs-5 fw-bold text-dark">Total a Pagar:</span>
+                            <span class="fs-4 fw-bold text-danger">S/ @GetGranTotal().ToString("0.00")</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string MovieId { get; set; }
+
+    [Parameter]
+    public string FuncionId { get; set; }
+
+    private FuncionViewModel Funcion;
+    private string paymentMethod = "Card";
+
+    // IDs obtenidos al crear la reserva en carga de página
+    private int idReserva = 0;
+    private int idPago = 0;
+    private bool reservaCreada = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserState.IsLoggedIn)
+        {
+            NavigationManager.NavigateTo($"/login?returnUrl=/movies/{MovieId}/seats/{FuncionId}/payment", forceLoad: false);
+            return;
+        }
+        Funcion = BookingState.CurrentFuncion;
+        if (Funcion == null) return;
+
+        // Crear la reserva (y el pago PENDIENTE) en cuanto carga la página
+        // → asientos pasan a estado RESERVADO (3) inmediatamente
+        try
+        {
+            var total = GetGranTotal();
+            var payload = BuildReservaPayload("TARJETA", total);
+            var nueva = await ReservasService.CrearAsync(payload);
+
+            if (nueva != null && nueva.IdReserva > 0 && nueva.Pago?.IdPago > 0)
+            {
+                idReserva = nueva.IdReserva;
+                idPago    = nueva.Pago!.IdPago;
+                reservaCreada = true;
+                BookingState.IdReserva = nueva.IdReserva;
+            }
+            else
+            {
+                errorMsg = "No se pudo reservar los asientos. Intenta de nuevo.";
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMsg = $"Error al reservar asientos: {ex.Message}";
+        }
+    }
+
+    private double GetGranTotal()
+    {
+        if (Funcion == null) return 0;
+        
+        double total = 0;
+        
+        // Sumar asientos
+        foreach (var seatId in BookingState.SelectedSeats)
+        {
+            var type = BookingState.TicketTypes.ContainsKey(seatId) ? BookingState.TicketTypes[seatId] : "REGULAR";
+            total += type switch {
+                "NIÑO" => Funcion.PrecioBase * 0.7,
+                "CONADIS" => Funcion.PrecioBase * 0.5,
+                _ => Funcion.PrecioBase
+            };
+        }
+        
+        // Sumar snacks
+        foreach (var snack in BookingState.SelectedSnacks)
+        {
+            var snackDetails = BookingState.AvailableSnacks.FirstOrDefault(s => s.IdItem == snack.Key);
+            if (snackDetails != null)
+            {
+                total += snackDetails.PrecioUnitario * snack.Value;
+            }
+        }
+        
+        return total;
+    }
+
+    private bool isProcessing = false;
+    private string errorMsg = string.Empty;
+
+    private ReservaViewModel BuildReservaPayload(string metodoPago, double total) =>
+        new ReservaViewModel
+        {
+            Usuario = new UsuarioReservaViewModel { IdUsuario = UserState.UserId!.Value },
+            Funcion = new FuncionReservaViewModel
+            {
+                Id       = Funcion!.Id,
+                FechaHora = Funcion.FechaHora,
+                Pelicula = Funcion.Pelicula,
+                Sala     = Funcion.Sala
+            },
+            Pago = new PagoReservaViewModel { Monto = total, Metodo = metodoPago },
+            Asientos = BookingState.SelectedSeats.Select(s =>
+            {
+                var a = Funcion?.MapaAsientos?.FirstOrDefault(x => x.IdAsiento == s);
+                return new AsientoReservaViewModel
+                {
+                    IdAsiento = s,
+                    Fila      = a?.Fila.ToString() ?? "",
+                    Numero    = a?.Numero ?? 0
+                };
+            }).ToList(),
+            Entradas = BookingState.SelectedSeats.Select(s =>
+            {
+                var type     = BookingState.TicketTypes.GetValueOrDefault(s, "REGULAR");
+                var javaType = type == "NIÑO" ? "NINO" : type;
+                return new EntradaViewModel { PrecioBase = Funcion!.PrecioBase, Tipo = javaType };
+            }).ToList()
+        };
+
+    private async Task ProcessPayment()
+    {
+        if (!reservaCreada || idPago <= 0)
+        {
+            errorMsg = "Los asientos aún no están reservados. Recarga la página e intenta de nuevo.";
+            return;
+        }
+
+        isProcessing = true;
+        errorMsg = string.Empty;
+        try
+        {
+            // Paso 1: Procesar el pago (PENDIENTE → APROBADO o FALLIDO)
+            var resultado = await ReservasService.ProcesarPagoAsync(idPago);
+            if (resultado == null)
+            {
+                errorMsg = "Error al conectar con el procesador de pagos. Intenta de nuevo.";
+                return;
+            }
+
+            if (!resultado.Aprobado)
+            {
+                // Pago rechazado → cancelar reserva para liberar asientos (RESERVADO → DISPONIBLE)
+                await ReservasService.CancelarReservaAsync(idReserva);
+                BookingState.IdReserva = 0;
+                reservaCreada = false;
+                errorMsg = "El pago fue rechazado. Los asientos han sido liberados. Puedes intentarlo de nuevo.";
+                return;
+            }
+
+            // Paso 2: Confirmar (asientos RESERVADO → OCUPADO, reserva → CONFIRMADA)
+            var confirmado = await ReservasService.ConfirmarPagoAsync(idPago);
+            if (!confirmado)
+            {
+                errorMsg = "El pago fue aprobado pero hubo un error al confirmar. Contacta con soporte.";
+                return;
+            }
+
+            BookingState.Clear();
+            NavigationManager.NavigateTo($"/ticket/{idReserva}");
+        }
+        catch (Exception ex)
+        {
+            errorMsg = $"Error inesperado: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+}

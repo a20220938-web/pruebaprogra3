@@ -1,0 +1,83 @@
+@implements IDisposable
+@inject CineFlow.Web.Servicios.User.UserState UserState
+<style>
+    /* Forzar visibilidad contra el collapse de Tailwind */
+    .navbar-collapse.collapse {
+        visibility: visible !important;
+    }
+</style>
+<nav class="navbar navbar-expand-lg bg-body-tertiary shadow-sm">
+    <div class="container">
+        <a class="navbar-brand d-flex align-items-center gap-2 text-decoration-none" href="/">
+            <div class="bg-danger rounded p-1 d-flex align-items-center justify-content-center">
+                <i class="bi bi-film text-white fs-5"></i>
+            </div>
+            <span class="text-body fw-bold fs-4">CineFlow</span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0 align-items-center">
+                @if (UserState.IsAdmin)
+                {
+                    <li class="nav-item">
+                        <NavLink class="nav-link px-3" href="/admin/ventas">Ventas</NavLink>
+                    </li>
+                    <li class="nav-item">
+                        <NavLink class="nav-link px-3" href="/admin/peliculas">Películas</NavLink>
+                    </li>
+                    <li class="nav-item">
+                        <NavLink class="nav-link px-3" href="/admin/confiteria">Confitería</NavLink>
+                    </li>
+                    <li class="nav-item">
+                        <NavLink class="nav-link px-3" href="/admin/inventario">Inventario</NavLink>
+                    </li>
+                }
+                else
+                {
+                    <li class="nav-item">
+                        <NavLink class="nav-link px-3" href="/" Match="NavLinkMatch.All">Cartelera</NavLink>
+                    </li>
+                    <li class="nav-item">
+                        <NavLink class="nav-link px-3" href="/theaters">Cines</NavLink>
+                    </li>
+                    <li class="nav-item">
+                        <NavLink class="nav-link px-3" href="/mis-reservas">Mis Reservas</NavLink>
+                    </li>
+                }
+            </ul>
+            <div class="d-flex align-items-center">
+                <button class="btn btn-outline-secondary me-3" onclick="toggleTheme()" title="Alternar tema">
+                    <i class="bi bi-circle-half"></i>
+                </button>
+                @if (UserState.IsLoggedIn)
+                {
+                    <span class="navbar-text me-3 fw-semibold">Hola, @UserState.Nombre</span>
+                    <a href="/profile" class="btn btn-outline-secondary rounded-circle px-2 py-1 me-2" title="Mi Perfil"><i class="bi bi-person-fill"></i></a>
+                    <form method="post" action="/account/logout" style="display:inline">
+                        <button type="submit" class="btn btn-outline-danger">Salir</button>
+                    </form>
+                }
+                else
+                {
+                    <a href="/login" class="btn btn-outline-secondary me-2">Iniciar Sesión</a>
+                    <a href="/register" class="btn btn-danger">Registrarse</a>
+                }
+            </div>
+        </div>
+    </div>
+</nav>
+
+@code {
+    protected override void OnInitialized()
+    {
+        UserState.OnChange += StateHasChanged;
+    }
+
+    public void Dispose()
+    {
+        UserState.OnChange -= StateHasChanged;
+    }
+
+}

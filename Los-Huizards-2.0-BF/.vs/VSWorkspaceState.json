@@ -1,0 +1,17 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\Frontend",
+    "\\Frontend\\CineFlow Front (C#) (1)",
+    "\\Frontend\\CineFlow Front (C#) (1)\\CineFlow Front (C#)",
+    "\\Frontend\\CineFlow Front (C#) (1)\\CineFlow Front (C#)\\CineFlow",
+    "\\Frontend\\CineFlow Front (C#) (1)\\CineFlow Front (C#)\\CineFlow\\CineFlow.Web",
+    "\\Frontend\\CineFlow Front (C#) (1)\\CineFlow Front (C#)\\CineFlow\\CineFlow.Web\\Components",
+    "\\Frontend\\CineFlow Front (C#) (1)\\CineFlow Front (C#)\\CineFlow\\CineFlow.Web\\Components\\Pages",
+    "\\Frontend\\CineFlow Front (C#) (1)\\CineFlow Front (C#)\\CineFlow\\CineFlow.Web\\Components\\Pages\\User",
+    "\\Frontend\\CineFlow Front (C#) (1)\\CineFlow Front (C#)\\CineFlow\\CineFlow.Web\\wwwroot",
+    "\\Frontend\\CineFlow Front (C#) (1)\\CineFlow Front (C#)\\CineFlow\\CineFlow.Web\\wwwroot\\lib"
+  ],
+  "SelectedNode": "\\Frontend\\CineFlow Front (C#) (1)\\CineFlow Front (C#)\\CineFlow\\CineFlow.Web\\Components\\Pages\\User\\Profile.razor",
+  "PreviewInSolutionExplorer": false
+}

@@ -1,0 +1,115 @@
+@using System.Threading
+@using Microsoft.AspNetCore.Components.Routing
+@using CineFlow.Web.Servicios.Reserva
+@implements IDisposable
+@inject NavigationManager NavigationManager
+@inject BookingState BookingState
+@inject IReservasServiceClient ReservasService
+
+@if (IsVisible && _reservationDeadline.HasValue)
+{
+    var remaining = _reservationDeadline.Value - DateTime.Now;
+    var minutes = Math.Max(0, remaining.Minutes);
+    var seconds = Math.Max(0, remaining.Seconds);
+    var isWarning = remaining.TotalSeconds <= 60;
+
+    <div class="fixed-top w-100 text-center py-2 shadow @(isWarning ? "bg-danger text-body" : "bg-warning text-dark")" style="z-index: 9999;">
+        <div class="container fw-bold d-flex justify-content-center align-items-center">
+            <i class="bi bi-stopwatch me-2 fs-5"></i>
+            <span>Tiempo restante para completar tu reserva: @minutes.ToString("00"):@seconds.ToString("00")</span>
+        </div>
+    </div>
+    
+    <style>
+        body { padding-top: 50px; }
+    </style>
+}
+
+@code {
+    private Timer? _timer;
+    private DateTime? _reservationDeadline;
+    private bool IsVisible => NavigationManager.Uri.Contains("/seats/") && !NavigationManager.Uri.Contains("/ticket/");
+
+    protected override void OnInitialized()
+    {
+        NavigationManager.LocationChanged += HandleLocationChanged;
+        CheckTimerState(NavigationManager.Uri);
+    }
+
+    private void HandleLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        CheckTimerState(e.Location);
+    }
+
+    private async void CheckTimerState(string url)
+    {
+        bool isResFlow = url.Contains("/seats/") && !url.Contains("/ticket/");
+        
+        if (isResFlow && _reservationDeadline == null)
+        {
+            // Start 5-minute timer
+            _reservationDeadline = DateTime.Now.AddMinutes(5);
+            _timer = new Timer(Tick, null, 0, 1000);
+        }
+        else if (!isResFlow && _reservationDeadline != null)
+        {
+            // Cancel timer y liberar reserva si no fue a ticket (pago exitoso)
+            if (BookingState.IdReserva > 0 && !url.Contains("/ticket/"))
+            {
+                await ReservasService.CancelarReservaAsync(BookingState.IdReserva);
+                BookingState.Clear();
+            }
+            
+            _reservationDeadline = null;
+            _timer?.Dispose();
+            _timer = null;
+        }
+        
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async void Tick(object? state)
+    {
+        if (_reservationDeadline.HasValue)
+        {
+            var remaining = _reservationDeadline.Value - DateTime.Now;
+            if (remaining.TotalSeconds <= 0)
+            {
+                // Expired
+                _reservationDeadline = null;
+                _timer?.Dispose();
+                _timer = null;
+                
+                await InvokeAsync(async () =>
+                {
+                    // Cancela la reserva en backend si existe (libera asientos RESERVADO → DISPONIBLE)
+                    if (BookingState.IdReserva > 0)
+                    {
+                        await ReservasService.CancelarReservaAsync(BookingState.IdReserva);
+                    }
+
+                    // Limpia el booking state
+                    BookingState.Clear();
+
+                    // Limpia el carrito legacy
+                    CineFlow.Web.Data.MockDataStore.CurrentSeats.Clear();
+                    CineFlow.Web.Data.MockDataStore.CurrentTicketTypes.Clear();
+                    CineFlow.Web.Data.MockDataStore.CurrentSnacks.Clear();
+
+                    // Enviamos al usuario al Home con timeout=true
+                    NavigationManager.NavigateTo("/?timeout=true", true);
+                });
+            }
+            else
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= HandleLocationChanged;
+        _timer?.Dispose();
+    }
+}
