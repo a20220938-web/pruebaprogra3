@@ -5,16 +5,25 @@ using System.ComponentModel.DataAnnotations;
 public class RegisterViewModel
 {
     [Required(ErrorMessage = "El nombre es requerido")]
+    [RegularExpression(@"^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ'\-\s]+$", ErrorMessage = "El nombre no puede contener números")]
     public string Nombre { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "El apellido es requerido")]
+    [RegularExpression(@"^[a-zA-ZáéíóúÁÉÍÓÚñÑüÜ'\-\s]+$", ErrorMessage = "El apellido no puede contener números")]
     public string Apellido { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "El correo electrónico es requerido")]
     [RegularExpression(
-        @"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.com$",
-        ErrorMessage = "Ingresa un correo válido con dominio .com (ej: nombre@ejemplo.com)")]
+        @"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$",
+        ErrorMessage = "Ingresa un correo válido (ej: nombre@ejemplo.com)")]
     public string Email { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "El teléfono es requerido")]
+    [RegularExpression(@"^9\d{8}$", ErrorMessage = "El teléfono debe tener 9 dígitos y comenzar con 9")]
+    public string Telefono { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "La fecha de nacimiento es requerida")]
+    public DateOnly? FechaNacimiento { get; set; }
 
     [Required(ErrorMessage = "La contraseña es requerida")]
     [RegularExpression(

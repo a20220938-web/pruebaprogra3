@@ -36,19 +36,35 @@
                         <div class="mb-3">
                             <label class="form-label text-body fw-semibold small">Correo Electrónico</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-body-tertiary border-secondary text-muted"><i class="bi bi-envelope"></i></span>
+                                <span class="input-group-text bg-body-tertiary border-secondary text-body"><i class="bi bi-envelope"></i></span>
                                 <InputText @bind-Value="registerModel.Email" class="form-control bg-body text-body border-secondary" placeholder="nombre@ejemplo.com" />
                             </div>
                             <ValidationMessage For="@(() => registerModel.Email)" class="text-danger small mt-1" />
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label text-body fw-semibold small">Teléfono</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-body-tertiary border-secondary text-body"><i class="bi bi-phone"></i></span>
+                                    <input type="tel" @bind="registerModel.Telefono" class="form-control bg-body text-body border-secondary" placeholder="9XXXXXXXX" maxlength="9" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
+                                </div>
+                                <ValidationMessage For="@(() => registerModel.Telefono)" class="text-danger small mt-1" />
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label text-body fw-semibold small">Fecha de Nacimiento</label>
+                                <InputDate max="@DateTime.Now.ToString("yyyy-MM-dd")" @bind-Value="registerModel.FechaNacimiento" class="form-control bg-body text-body border-secondary" />
+                                <ValidationMessage For="@(() => registerModel.FechaNacimiento)" class="text-danger small mt-1" />
+                            </div>
                         </div>
                         
                         <div class="mb-3">
                             <label class="form-label text-body fw-semibold small">Contraseña</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-body-tertiary border-secondary text-muted"><i class="bi bi-lock"></i></span>
+                                <span class="input-group-text bg-body-tertiary border-secondary text-body"><i class="bi bi-lock"></i></span>
                                 <InputText type="password" @bind-Value="registerModel.Password" class="form-control bg-body text-body border-secondary" placeholder="••••••••" />
                             </div>
-                            <div class="form-text text-muted small mt-1">
+                            <div class="form-text text-body-secondary small mt-1">
                                 <i class="bi bi-info-circle me-1"></i>Mínimo 6 caracteres y al menos 1 carácter especial (ej: <code>!@@#$%</code>)
                             </div>
                             <ValidationMessage For="@(() => registerModel.Password)" class="text-danger small mt-1" />
@@ -57,7 +73,7 @@
                         <div class="mb-4">
                             <label class="form-label text-body fw-semibold small">Confirmar Contraseña</label>
                             <div class="input-group">
-                                <span class="input-group-text bg-body-tertiary border-secondary text-muted"><i class="bi bi-lock-fill"></i></span>
+                                <span class="input-group-text bg-body-tertiary border-secondary text-body"><i class="bi bi-lock-fill"></i></span>
                                 <InputText type="password" @bind-Value="registerModel.ConfirmPassword" class="form-control bg-body text-body border-secondary" placeholder="••••••••" />
                             </div>
                             <ValidationMessage For="@(() => registerModel.ConfirmPassword)" class="text-danger small mt-1" />
@@ -81,7 +97,7 @@
                     </EditForm>
                     
                     <div class="text-center mt-4">
-                        <p class="text-muted small mb-0">¿Ya tienes cuenta? <a href="/Auth/Login" class="text-danger fw-bold text-decoration-none">Inicia sesión</a></p>
+                        <p class="text-danger fw-bold small mb-0">¿Ya tienes cuenta? <a href="/Auth/Login" class="text-danger fw-bold text-decoration-underline">Inicia sesión</a></p>
                     </div>
                 </div>
             </div>

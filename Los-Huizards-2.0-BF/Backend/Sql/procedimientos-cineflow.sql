@@ -163,11 +163,13 @@ END //
 CREATE PROCEDURE modificarPago(
     IN p_estado VARCHAR(30),
     IN p_monto  DECIMAL(10,2),
+    IN p_metodo VARCHAR(40),
     IN p_id     INT)
 BEGIN
     UPDATE PAGO
     SET estado = p_estado,
-        monto  = p_monto
+        monto  = p_monto,
+        metodo = p_metodo
     WHERE idPago = p_id;
 END //
 

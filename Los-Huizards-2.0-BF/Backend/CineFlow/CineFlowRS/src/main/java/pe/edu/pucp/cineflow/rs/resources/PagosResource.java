@@ -12,6 +12,7 @@ import pe.edu.pucp.cineflow.modelo.pago.EstadoPago;
 import pe.edu.pucp.cineflow.modelo.pago.MetodoPago;
 import pe.edu.pucp.cineflow.modelo.pago.Pago;
 import pe.edu.pucp.cineflow.modelo.reporte.ComprobanteCompra;
+import pe.edu.pucp.cineflow.rs.util.StripeService;
 
 import java.net.URI;
 import java.time.LocalDateTime;
@@ -84,10 +85,10 @@ public class PagosResource {
         return Response.created(location).entity(pago).build();
     }
 
-    // RF13 - Simular procesamiento con proveedor externo (PENDIENTE → PROCESANDO → APROBADO/FALLIDO)
+    // RF13 - Procesar pago con Stripe (tarjeta) o simular (Yape/Plin)
     @POST
     @Path("{id}/procesar")
-    public Response procesar(@PathParam("id") int id) {
+    public Response procesar(@PathParam("id") int id, Map<String, String> body) {
         Pago pago = pagoBo.obtener(id);
         if (pago == null) {
             return Response.status(Response.Status.NOT_FOUND)
@@ -100,15 +101,30 @@ public class PagosResource {
                     .build();
         }
 
-        // Simula la respuesta del proveedor externo
-        boolean aprobado = pago.procesarPago();
+        boolean aprobado;
+        String metodoPago = body != null ? body.getOrDefault("metodoPago", "TARJETA") : "TARJETA";
+        String cardNumber = body != null ? body.getOrDefault("cardNumber", "") : "";
+
+        try {
+            if ("TARJETA".equals(metodoPago)) {
+                aprobado = StripeService.cobrar(pago.getMonto(), "CineFlow reserva #" + id, cardNumber);
+            } else {
+                aprobado = StripeService.cobrarBilleteraDigital(pago.getMonto());
+            }
+        } catch (Exception e) {
+            System.err.println("[PagosResource] Error Stripe: " + e.getMessage());
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of("error", "Error al procesar el pago: " + e.getMessage()))
+                    .build();
+        }
+
         pago.actualizarEstado(aprobado);
         pagoBo.guardar(pago, Estado.Modificado);
 
         return Response.ok(Map.of(
                 "aprobado", aprobado,
                 "estado", pago.getEstado().name(),
-                "mensaje", aprobado ? "Pago aprobado por el proveedor" : "Pago rechazado por el proveedor"
+                "mensaje", aprobado ? "Pago aprobado" : "Pago rechazado"
         )).build();
     }
 

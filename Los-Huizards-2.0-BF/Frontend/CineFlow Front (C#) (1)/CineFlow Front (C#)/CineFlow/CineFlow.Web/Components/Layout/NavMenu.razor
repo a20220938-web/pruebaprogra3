@@ -28,6 +28,9 @@
                         <NavLink class="nav-link px-3" href="/admin/peliculas">Películas</NavLink>
                     </li>
                     <li class="nav-item">
+                        <NavLink class="nav-link px-3" href="/admin/funciones">Funciones</NavLink>
+                    </li>
+                    <li class="nav-item">
                         <NavLink class="nav-link px-3" href="/admin/confiteria">Confitería</NavLink>
                     </li>
                     <li class="nav-item">
@@ -39,18 +42,13 @@
                     <li class="nav-item">
                         <NavLink class="nav-link px-3" href="/" Match="NavLinkMatch.All">Cartelera</NavLink>
                     </li>
-                    <li class="nav-item">
-                        <NavLink class="nav-link px-3" href="/theaters">Cines</NavLink>
-                    </li>
+
                     <li class="nav-item">
                         <NavLink class="nav-link px-3" href="/mis-reservas">Mis Reservas</NavLink>
                     </li>
                 }
             </ul>
             <div class="d-flex align-items-center">
-                <button class="btn btn-outline-secondary me-3" onclick="toggleTheme()" title="Alternar tema">
-                    <i class="bi bi-circle-half"></i>
-                </button>
                 @if (UserState.IsLoggedIn)
                 {
                     <span class="navbar-text me-3 fw-semibold">Hola, @UserState.Nombre</span>

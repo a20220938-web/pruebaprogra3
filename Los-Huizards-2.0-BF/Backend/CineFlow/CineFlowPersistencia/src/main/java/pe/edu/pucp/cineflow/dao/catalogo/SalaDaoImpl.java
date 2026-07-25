@@ -4,6 +4,8 @@ import pe.edu.pucp.cineflow.dao.DefaultBaseDao;
 import pe.edu.pucp.cineflow.modelo.catalogo.Sala;
 
 import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class SalaDaoImpl extends DefaultBaseDao<Sala> implements ISalaDao {
 
@@ -61,5 +63,23 @@ public class SalaDaoImpl extends DefaultBaseDao<Sala> implements ISalaDao {
                 0,
                 new CineDaoImpl().leer(idCine)
         );
+    }
+
+    @Override
+    public List<Sala> listarPorCine(int idCine) {
+        return ejecutarComando(conn -> {
+            List<Sala> salas = new ArrayList<>();
+            try (PreparedStatement cmd = conn.prepareStatement("SELECT * FROM SALA WHERE id_cine = ?;")) {
+                cmd.setInt(1, idCine);
+                try (ResultSet rs = cmd.executeQuery()) {
+                    while (rs.next()) {
+                        salas.add(mapearModelo(rs));
+                    }
+                }
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+            return salas;
+        });
     }
 }

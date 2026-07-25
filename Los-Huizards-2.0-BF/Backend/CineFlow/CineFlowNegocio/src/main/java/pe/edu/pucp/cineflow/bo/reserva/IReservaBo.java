@@ -14,4 +14,5 @@ public interface IReservaBo extends IGestionable<Reserva> {
     ComprobanteCompra generarComprobante(int idReserva);
     long obtenerTiempoRestanteSegundos(int idReserva);
     void expirarSiCorresponde(int idReserva);
+    void expirarReservasVencidasPorFuncion(int idFuncion);
 }

@@ -7,7 +7,7 @@
     <parent>
         <artifactId>CineFlow</artifactId>
         <groupId>pe.edu.pucp.cineflow</groupId>
-        <version>1.0-SNAPSHOT</version>
+        <version>1.0</version>
     </parent>
 
     <artifactId>CineFlowWS</artifactId>
@@ -36,7 +36,7 @@
         <dependency>
             <groupId>pe.edu.pucp.cineflow</groupId>
             <artifactId>CineFlowNegocio</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <version>1.0</version>
         </dependency>
     </dependencies>
 

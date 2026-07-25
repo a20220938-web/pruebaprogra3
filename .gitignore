@@ -1,0 +1,24 @@
+# ===== Java / Maven (backend) =====
+target/
+*.class
+
+# ===== .NET / C# (frontend Blazor) =====
+bin/
+obj/
+*.user
+*.suo
+
+# ===== IDEs =====
+.idea/
+*.iml
+.vs/
+.vscode/
+
+# ===== Sistema operativo =====
+.DS_Store
+Thumbs.db
+
+# ===== Credenciales (NO subir contraseñas) =====
+# Data Adapter de Jaspersoft con la contraseña del RDS en texto plano.
+# Descomenta si NO quieres compartirlo con el equipo:
+# Backend/CineFlow/CineFlowReportes/jaspersoft/CineFlow_MySQL_DataAdapter.xml

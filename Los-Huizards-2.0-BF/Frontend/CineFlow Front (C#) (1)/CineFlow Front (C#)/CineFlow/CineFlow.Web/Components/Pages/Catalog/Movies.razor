@@ -3,6 +3,8 @@
 @using CineFlow.Web.Servicios.Catalogo
 @using CineFlow.Web.ViewModels.Catalogo
 @inject IPeliculasServiceClient PeliculasService
+@inject ICinesServiceClient CinesService
+@inject IFuncionesServiceClient FuncionesService
 
 <PageTitle>Cartelera - CineFlow</PageTitle>
 
@@ -35,17 +37,22 @@
         <div class="row g-3">
             <div class="col-md-2">
                 <label class="text-light fw-semibold small mb-1"><i class="bi bi-geo-alt-fill text-danger me-1"></i>Sede</label>
-                <select class="form-select bg-body-tertiary text-body border-secondary" @bind="selectedCineId">
+                <select class="form-select bg-body-tertiary text-body border-secondary" @bind="selectedCineId" @bind:after="CargarPeliculas">
                     <option value="">Todas las Sedes</option>
                     @foreach (var cine in CinesDisponibles)
                     {
-                        <option value="@cine.Id">@cine.Nombre</option>
+                        <option value="@cine.Nombre">@cine.Nombre?.Replace("CineFlow ", "")</option>
                     }
                 </select>
             </div>
             <div class="col-md-2">
                 <label class="text-light fw-semibold small mb-1"><i class="bi bi-calendar-event text-danger me-1"></i>Fecha</label>
-                <input type="date" class="form-control bg-body-tertiary text-body border-secondary" @bind="selectedDate" />
+                <select class="form-select bg-body-tertiary text-body border-secondary" @bind="selectedDateFilter">
+                    <option value="">Todas</option>
+                    <option value="Hoy">Hoy (@DateTime.Now.ToString("dd/MM"))</option>
+                    <option value="Manana">Mañana (@DateTime.Now.AddDays(1).ToString("dd/MM"))</option>
+                    <option value="Pasado">Pasado (@DateTime.Now.AddDays(2).ToString("dd/MM"))</option>
+                </select>
             </div>
             <div class="col-md-3">
                 <label class="text-light fw-semibold small mb-1"><i class="bi bi-film text-danger me-1"></i>Género</label>
@@ -58,7 +65,7 @@
                 </select>
             </div>
             <div class="col-md-2">
-                <label class="text-light fw-semibold small mb-1"><i class="bi bi-person-badge text-danger me-1"></i>Censura</label>
+                <label class="text-light fw-semibold small mb-1"><i class="bi bi-person-badge text-danger me-1"></i>Clasificación</label>
                 <select class="form-select bg-body-tertiary text-body border-secondary" @bind="selectedClasificacion">
                     <option value="">Cualquiera</option>
                     <option value="ATP">Apto para Todos (ATP)</option>
@@ -68,7 +75,7 @@
             </div>
             <div class="col-md-2">
                 <label class="text-light fw-semibold small mb-1"><i class="bi bi-hourglass-split text-danger me-1"></i>Duración Máx: @(maxDuracion) min</label>
-                <input type="range" class="form-range" min="60" max="180" step="5" @bind="maxDuracion" @bind:event="oninput" />
+                <input type="range" class="form-range" min="60" max="300" step="5" @bind="maxDuracion" @bind:event="oninput" />
             </div>
             <div class="col-md-1 d-flex align-items-end">
                 <button class="btn btn-outline-danger w-100" @onclick="LimpiarFiltros" title="Limpiar filtros">
@@ -78,7 +85,7 @@
         </div>
     </div>
 
-    @if (Peliculas == null)
+    @if (cargando)
     {
         <div class="text-center py-5">
             <div class="spinner-border text-danger" role="status">
@@ -89,10 +96,10 @@
     }
     else if (!PeliculasFiltradas.Any())
     {
-        <div class="alert alert-dark text-center mt-5 py-5 border-secondary">
+        <div class="alert alert-secondary text-center mt-5 py-5 border-secondary">
             <i class="bi bi-camera-reels text-muted display-1 mb-3"></i>
-            <h4 class="text-body">No se encontraron películas</h4>
-            <p class="text-muted">Intenta aflojar algunos filtros o buscar con otro término.</p>
+            <h4 class="text-body fw-bold">No se encontraron películas</h4>
+            <p class="text-body">Intenta aflojar algunos filtros o buscar con otro término.</p>
             <button class="btn btn-outline-danger mt-2" @onclick="LimpiarFiltros">Limpiar Filtros</button>
         </div>
     }
@@ -111,9 +118,14 @@
                         </div>
                         <div class="card-body d-flex flex-column">
                             <h5 class="card-title fw-bold text-body mb-1">@pelicula.Titulo</h5>
+                            @{
+                                var cinesAsociados = TodasLasFunciones.Where(f => f.Pelicula?.Id == pelicula.Id && f.Sala?.Cine?.Nombre != null).Select(f => f.Sala!.Cine!.Nombre).Distinct().ToList();
+                                var cinesText = cinesAsociados.Any() ? string.Join(", ", cinesAsociados) : "Varias sedes";
+                            }
+                            <p class="text-body small mb-2"><i class="bi bi-geo-alt me-1"></i>@cinesText</p>
                             <div class="d-flex justify-content-between align-items-center mb-3">
                                 <span class="badge bg-secondary text-light">@pelicula.Genero</span>
-                                <small class="text-muted"><i class="bi bi-clock me-1"></i>@pelicula.Duracion min</small>
+                                <small class="text-body"><i class="bi bi-clock me-1"></i>@pelicula.Duracion min</small>
                             </div>
                             <a href="/movies/@pelicula.Id" class="btn btn-danger w-100 mt-auto rounded-pill fw-bold">Ver Funciones</a>
                         </div>
@@ -132,35 +144,55 @@
 </style>
 
 @code {
-    private List<PeliculaViewModel> Peliculas;
-    // CinesDisponibles can be populated later
+    private List<PeliculaViewModel> Peliculas = new();
     private List<CineViewModel> CinesDisponibles = new();
+    private List<FuncionViewModel> TodasLasFunciones = new();
     private List<string> GenerosUnicos = new();
+    private bool cargando = true;
 
     // Filtros
     private string searchTerm = "";
     private string selectedCineId = "";
-    private DateTime? selectedDate = null;
+    private string selectedDateFilter = "";
     private string selectedGenero = "";
     private string selectedClasificacion = "";
-    private int maxDuracion = 180;
+    private int maxDuracion = 300;
     private string selectedSort = "Titulo";
 
     protected override async Task OnInitializedAsync()
+    {
+        cargando = true;
+        await Task.WhenAll(CargarPeliculas(), CargarCines(), CargarFunciones());
+        cargando = false;
+        StateHasChanged(); 
+    }
+
+    private async Task CargarFunciones()
+    {
+        TodasLasFunciones = await FuncionesService.ListarAsync() ?? new List<FuncionViewModel>();
+    }
+
+    private async Task CargarCines()
+    {
+        CinesDisponibles = await CinesService.ListarAsync() ?? new List<CineViewModel>();
+    }
+
+    private async Task CargarPeliculas()
     {
         Peliculas = await PeliculasService.ListarAsync() ?? new List<PeliculaViewModel>();
         GenerosUnicos = Peliculas.Where(p => p.Genero != null).Select(p => p.Genero!).Distinct().OrderBy(g => g).ToList();
     }
 
-    private void LimpiarFiltros()
+    private async Task LimpiarFiltros()
     {
         searchTerm = "";
         selectedCineId = "";
-        selectedDate = null;
+        selectedDateFilter = "";
         selectedGenero = "";
         selectedClasificacion = "";
-        maxDuracion = 180;
+        maxDuracion = 300;
         selectedSort = "Titulo";
+        await CargarPeliculas();
     }
 
     private IEnumerable<PeliculaViewModel> PeliculasFiltradas 
@@ -169,19 +201,50 @@
         {
             var query = Peliculas.AsEnumerable();
 
+            // Ocultar películas antiguas: solo mostrar las que tienen al menos una función hoy o en el futuro
+            var hoy = DateTime.Now.Date;
+            var idsPeliculasVigentes = (TodasLasFunciones ?? new())
+                .Where(f => f.FechaHora >= hoy && f.Pelicula != null)
+                .Select(f => f.Pelicula.Id)
+                .ToHashSet();
+
+            query = query.Where(p => idsPeliculasVigentes.Contains(p.Id));
+
             // Filtrar por Nombre
             if (!string.IsNullOrWhiteSpace(searchTerm))
             {
                 query = query.Where(p => p.Titulo?.Contains(searchTerm, StringComparison.OrdinalIgnoreCase) == true);
             }
 
-            // Omito filtro por sede y fecha local en memoria por simplicidad
+            // Filtrar por Sede
+            if (!string.IsNullOrEmpty(selectedCineId))
+            {
+                var idsPeliculasSede = (TodasLasFunciones ?? new())
+                    .Where(f => f.Sala?.Cine?.Nombre != null && f.Sala.Cine.Nombre.Equals(selectedCineId, StringComparison.OrdinalIgnoreCase) && f.Pelicula != null)
+                    .Select(f => f.Pelicula.Id)
+                    .ToHashSet();
 
+                query = query.Where(p => idsPeliculasSede.Contains(p.Id));
+            }
 
-            // Filtrar por Fecha - (Requeriría buscar funciones localmente, se deja sin implementar para mock local o se puede hacer API call)
+            // Filtrar por Fecha usando funciones reales de la BD
+            if (!string.IsNullOrEmpty(selectedDateFilter))
+            {
+                DateTime? targetDate = null;
+                if (selectedDateFilter == "Hoy") targetDate = DateTime.Now.Date;
+                else if (selectedDateFilter == "Manana") targetDate = DateTime.Now.Date.AddDays(1);
+                else if (selectedDateFilter == "Pasado") targetDate = DateTime.Now.Date.AddDays(2);
 
+                if (targetDate.HasValue)
+                {
+                    var idsPeliculas = (TodasLasFunciones ?? new())
+                        .Where(f => f.FechaHora.Date == targetDate.Value && f.Pelicula != null)
+                        .Select(f => f.Pelicula.Id)
+                        .ToHashSet();
 
-            // Filtrar por Género
+                    query = query.Where(p => idsPeliculas.Contains(p.Id));
+                }
+            }            // Filtrar por Género
             if (!string.IsNullOrEmpty(selectedGenero))
             {
                 query = query.Where(p => p.Genero?.Equals(selectedGenero, StringComparison.OrdinalIgnoreCase) == true);

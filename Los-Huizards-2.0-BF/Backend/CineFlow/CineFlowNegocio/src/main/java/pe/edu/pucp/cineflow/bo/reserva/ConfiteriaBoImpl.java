@@ -12,6 +12,8 @@ import java.util.Objects;
 public class ConfiteriaBoImpl extends BaseBo implements IConfiteriaBo {
 
     private final IConfiteriaDao confiteriaDao = new ConfiteriaDaoImpl();
+    private final pe.edu.pucp.cineflow.dao.reserva.IInventarioCineDao inventarioDao =
+            new pe.edu.pucp.cineflow.dao.reserva.InventarioCineDaoImpl();
 
 
     @Override
@@ -60,6 +62,9 @@ public class ConfiteriaBoImpl extends BaseBo implements IConfiteriaBo {
         } else {
             throw new IllegalArgumentException("Estado no soportado en guardar: " + estado);
         }
+
+        // Mantener inventario_cine.stock_actual = SUMA de CONFITERIA.cantidad
+        inventarioDao.recalcularStock();
     }
 
 
@@ -68,5 +73,6 @@ public class ConfiteriaBoImpl extends BaseBo implements IConfiteriaBo {
         validarIdPositivo(id, "id del artículo");
         if (!confiteriaDao.eliminar(id))
             throw new IllegalStateException("No se pudo eliminar el artículo con id: " + id);
+        inventarioDao.recalcularStock();
     }
 }

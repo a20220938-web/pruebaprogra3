@@ -7,8 +7,11 @@ import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import pe.edu.pucp.cineflow.bo.catalogo.CineBoImpl;
 import pe.edu.pucp.cineflow.bo.catalogo.ICineBo;
+import pe.edu.pucp.cineflow.bo.catalogo.ISalaBo;
+import pe.edu.pucp.cineflow.bo.catalogo.SalaBoImpl;
 import pe.edu.pucp.cineflow.modelo.Estado;
 import pe.edu.pucp.cineflow.modelo.catalogo.Cine;
+import pe.edu.pucp.cineflow.modelo.catalogo.Sala;
 
 import java.net.URI;
 import java.util.List;
@@ -20,12 +23,14 @@ import java.util.Map;
 public class CinesResource {
 
     private final ICineBo cineBo;
+    private final ISalaBo salaBo;
 
     @Context
     private UriInfo uriInfo;
 
     public CinesResource() {
         this.cineBo = new CineBoImpl();
+        this.salaBo = new SalaBoImpl();
     }
 
     @GET
@@ -43,6 +48,18 @@ public class CinesResource {
                     .build();
         }
         return Response.ok(cine).build();
+    }
+
+    @GET
+    @Path("{id}/salas")
+    public Response listarSalas(@PathParam("id") int id) {
+        if (cineBo.obtener(id) == null) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(Map.of("error", "Cine con id " + id + " no encontrado"))
+                    .build();
+        }
+        List<Sala> salas = salaBo.listarPorCine(id);
+        return Response.ok(salas).build();
     }
 
     @POST
@@ -72,6 +89,7 @@ public class CinesResource {
                     .entity(Map.of("error", "El payload del cine es invalido"))
                     .build();
         }
+        cine.setId(id);
         cineBo.guardar(cine, Estado.Modificado);
         return Response.ok(cine).build();
     }

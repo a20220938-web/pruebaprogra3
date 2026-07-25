@@ -3,13 +3,17 @@
 @using CineFlow.Web.ViewModels.Catalogo
 @inject NavigationManager NavigationManager
 @inject BookingState BookingState
+@inject IReservasServiceClient ReservasService
 @inject CineFlow.Web.Servicios.User.UserState UserState
 
 <PageTitle>Tipo de Entrada - CineFlow</PageTitle>
 
 <div class="container py-5 text-body">
-    <h2 class="fw-bold mb-4">Tipo de entrada</h2>
-    <p class="text-muted mb-5">Selecciona el tipo de entrada para cada asiento</p>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">Tipo de entrada</h2>
+        <CancelReservation MovieId="@MovieId" />
+    </div>
+    <p class="text-body-secondary mb-5">Selecciona el tipo de entrada para cada asiento</p>
 
     <div class="row">
         <div class="col-md-8">
@@ -21,20 +25,20 @@
                         if (asiento != null)
                         {
                             var currentType = GetTicketType(asientoId);
-                            <div class="border border-secondary p-4 rounded mb-3">
+                            <div class="border border-secondary p-4 rounded mb-3 bg-body">
                                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
                                     <div class="mb-3 mb-md-0">
-                                        <h5 class="fw-bold mb-1">Asiento @asiento.Label</h5>
-                                        <p class="text-muted small mb-0">Precio: S/ @GetPrice(currentType).ToString("0.00")</p>
+                                        <h5 class="fw-bold mb-1 text-body">Asiento @asiento.Label</h5>
+                                        <p class="text-body-secondary small mb-0">Precio: S/ @GetPrice(currentType).ToString("0.00")</p>
                                     </div>
                                     <div class="d-flex gap-2">
-                                        <button class="btn @(currentType == "REGULAR" ? "btn-danger" : "btn-outline-light")" @onclick="@(() => SetTicketType(asientoId, "REGULAR"))">
+                                        <button class="btn @(currentType == "REGULAR" ? "btn-danger text-white" : "btn-outline-secondary text-body")" @onclick="@(() => SetTicketType(asientoId, "REGULAR"))">
                                             Regular <br/><small>S/ @GetPrice("REGULAR").ToString("0.00")</small>
                                         </button>
-                                        <button class="btn @(currentType == "NIÑO" ? "btn-danger" : "btn-outline-light")" @onclick="@(() => SetTicketType(asientoId, "NIÑO"))">
+                                        <button class="btn @(currentType == "NIÑO" ? "btn-danger text-white" : "btn-outline-secondary text-body")" @onclick="@(() => SetTicketType(asientoId, "NIÑO"))">
                                             Niño <br/><small>S/ @GetPrice("NIÑO").ToString("0.00") (30% dto.)</small>
                                         </button>
-                                        <button class="btn @(currentType == "CONADIS" ? "btn-danger" : "btn-outline-light")" @onclick="@(() => SetTicketType(asientoId, "CONADIS"))">
+                                        <button class="btn @(currentType == "CONADIS" ? "btn-danger text-white" : "btn-outline-secondary text-body")" @onclick="@(() => SetTicketType(asientoId, "CONADIS"))">
                                             CONADIS <br/><small>S/ @GetPrice("CONADIS").ToString("0.00") (50% dto.)</small>
                                         </button>
                                     </div>
@@ -135,8 +139,15 @@
         NavigationManager.NavigateTo($"/movies/{MovieId}/seats/{FuncionId}/snacks");
     }
 
-    private void GoBack()
+    private async Task GoBack()
     {
+        if (BookingState.PreReservedSeats.Any())
+        {
+            try { await ReservasService.LiberarAsientosAsync(BookingState.PreReservedSeats); } catch { }
+            BookingState.PreReservedSeats.Clear();
+            BookingState.SelectedSeats.Clear();
+            BookingState.TicketTypes.Clear();
+        }
         NavigationManager.NavigateTo($"/movies/{MovieId}/seats/{FuncionId}");
     }
 }

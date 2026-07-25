@@ -18,6 +18,7 @@ public class Reserva {
     private Usuario usuario;
     private List<Entrada> entradas;
     private Confiteria confiteria;
+    private List<ArticuloIndividual> confiterias;  // NUEVO: varios snacks por reserva
     private List<Asiento> asientos;
     private Pago pago;
     private Funcion funcion;   // NUEVO: relación directa con la función
@@ -132,6 +133,14 @@ public class Reserva {
         this.confiteria = confiteria;
     }
 
+    public List<ArticuloIndividual> getConfiterias() {
+        return confiterias;
+    }
+
+    public void setConfiterias(List<ArticuloIndividual> confiterias) {
+        this.confiterias = confiterias;
+    }
+
     public List<Asiento> getAsientos() {
         return asientos;
     }
@@ -179,6 +188,11 @@ public class Reserva {
         }
         if (confiteria != null) {
             total += confiteria.calcularSubtotal();
+        }
+        if (confiterias != null) {
+            for (ArticuloIndividual c : confiterias) {
+                total += c.calcularSubtotal();
+            }
         }
         this.totalFinal = total;
         return total;

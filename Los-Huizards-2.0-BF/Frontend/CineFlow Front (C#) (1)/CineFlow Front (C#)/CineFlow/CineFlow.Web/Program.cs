@@ -6,6 +6,7 @@ using CineFlow.Web.Servicios.Auth;
 using CineFlow.Web.Servicios.User;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +19,10 @@ builder.Services.AddHttpClient();
 
 // Autenticación de CineFlow
 builder.Services.AddCineFlowAuthentication();
+
+// Llaves de Data Protection efímeras (solo en memoria): al reiniciar la app,
+// las cookies de sesión emitidas antes dejan de ser válidas y se cierra la sesión.
+builder.Services.AddDataProtection().UseEphemeralDataProtectionProvider();
 
 // Inyección de dependencias de Negocio y Servicios API REST
 builder.Services.AddHttpClient<IAuthServiceClient, AuthServiceRestClient>(client =>
@@ -37,6 +42,10 @@ builder.Services.AddHttpClient<CineFlow.Web.Servicios.Catalogo.IPeliculasService
 {
     client.BaseAddress = new Uri(apiUrl);
 });
+builder.Services.AddHttpClient<CineFlow.Web.Servicios.Catalogo.ICinesServiceClient, CineFlow.Web.Servicios.Catalogo.CinesServiceRestClient>(client =>
+{
+    client.BaseAddress = new Uri(apiUrl);
+});
 builder.Services.AddHttpClient<CineFlow.Web.Servicios.Catalogo.IFuncionesServiceClient, CineFlow.Web.Servicios.Catalogo.FuncionesServiceRestClient>(client =>
 {
     client.BaseAddress = new Uri(apiUrl);
@@ -48,14 +57,20 @@ builder.Services.AddHttpClient<CineFlow.Web.Servicios.Reserva.IConfiteriaService
 builder.Services.AddHttpClient<CineFlow.Web.Servicios.Reserva.IReservasServiceClient, CineFlow.Web.Servicios.Reserva.ReservasServiceRestClient>(client =>
 {
     client.BaseAddress = new Uri(apiUrl);
+    client.Timeout = TimeSpan.FromMinutes(5);
 });
 builder.Services.AddHttpClient<CineFlow.Web.Servicios.Catalogo.IReportesServiceClient, CineFlow.Web.Servicios.Catalogo.ReportesServiceRestClient>(client =>
+{
+    client.BaseAddress = new Uri(apiUrl);
+});
+builder.Services.AddHttpClient<CineFlow.Web.Servicios.Reserva.IInventarioServiceClient, CineFlow.Web.Servicios.Reserva.InventarioServiceRestClient>(client =>
 {
     client.BaseAddress = new Uri(apiUrl);
 });
 
 // Estado para el flujo de reserva
 builder.Services.AddScoped<CineFlow.Web.Servicios.Reserva.BookingState>();
+builder.Services.AddScoped<CineFlow.Web.Servicios.Reserva.ReservasCacheService>();
 
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();

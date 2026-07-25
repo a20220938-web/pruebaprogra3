@@ -15,9 +15,13 @@ public interface IReservasServiceClient
 {
     Task<ReservaViewModel?> CrearAsync(ReservaViewModel reserva);
     Task<List<ReservaViewModel>> ListarPorUsuarioAsync(int idUsuario);
-    Task<ProcesarPagoResult?> ProcesarPagoAsync(int idPago);
+    Task<ProcesarPagoResult?> ProcesarPagoAsync(int idPago, string metodoPago = "TARJETA",
+        string cardNumber = "", string expiry = "", string cvc = "");
+    Task<bool> ActualizarMetodoPagoAsync(int idPago, string metodo, double monto);
     Task<bool> ConfirmarPagoAsync(int idPago);
     Task<bool> CancelarReservaAsync(int idReserva);
+    Task<bool> PreReservarAsientosAsync(List<int> idsAsientos);
+    Task<bool> LiberarAsientosAsync(List<int> idsAsientos);
 }
 
 public class ReservasServiceRestClient : IReservasServiceClient
@@ -62,14 +66,38 @@ public class ReservasServiceRestClient : IReservasServiceClient
         return new List<ReservaViewModel>();
     }
 
-    public async Task<ProcesarPagoResult?> ProcesarPagoAsync(int idPago)
+    public async Task<ProcesarPagoResult?> ProcesarPagoAsync(int idPago, string metodoPago = "TARJETA",
+        string cardNumber = "", string expiry = "", string cvc = "")
     {
-        var response = await _httpClient.PostAsync($"v1/pagos/{idPago}/procesar", null);
+        var body = new { metodoPago, cardNumber, expiry, cvc };
+        var response = await _httpClient.PostAsJsonAsync($"v1/pagos/{idPago}/procesar", body, _options);
         if (response.IsSuccessStatusCode)
             return await response.Content.ReadFromJsonAsync<ProcesarPagoResult>(_options);
         var err = await response.Content.ReadAsStringAsync();
         Console.WriteLine($"[ERROR procesar pago]: {err}");
         return null;
+    }
+
+    public async Task<bool> ActualizarMetodoPagoAsync(int idPago, string metodo, double monto)
+    {
+        // PUT v1/pagos/{id}: actualiza el metodo elegido (TARJETA / BILLETERA_DIGITAL)
+        // antes de procesar. El pago sigue en estado PENDIENTE.
+        // 'fecha' es obligatoria en la validacion del backend (no se usa para el UPDATE).
+        var body = new
+        {
+            idPago,
+            monto,
+            metodo,
+            estado = "PENDIENTE",
+            fecha = DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss")
+        };
+        var response = await _httpClient.PutAsJsonAsync($"v1/pagos/{idPago}", body, _options);
+        if (!response.IsSuccessStatusCode)
+        {
+            var err = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[ERROR actualizar metodo pago]: {err}");
+        }
+        return response.IsSuccessStatusCode;
     }
 
     public async Task<bool> ConfirmarPagoAsync(int idPago)
@@ -90,6 +118,28 @@ public class ReservasServiceRestClient : IReservasServiceClient
         {
             var err = await response.Content.ReadAsStringAsync();
             Console.WriteLine($"[ERROR cancelar reserva]: {err}");
+        }
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> PreReservarAsientosAsync(List<int> idsAsientos)
+    {
+        var response = await _httpClient.PostAsJsonAsync("v1/asientos/pre-reservar", idsAsientos, _options);
+        if (!response.IsSuccessStatusCode)
+        {
+            var err = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[ERROR pre-reservar asientos]: {err}");
+        }
+        return response.IsSuccessStatusCode;
+    }
+
+    public async Task<bool> LiberarAsientosAsync(List<int> idsAsientos)
+    {
+        var response = await _httpClient.PostAsJsonAsync("v1/asientos/liberar", idsAsientos, _options);
+        if (!response.IsSuccessStatusCode)
+        {
+            var err = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"[ERROR liberar asientos]: {err}");
         }
         return response.IsSuccessStatusCode;
     }

@@ -6,6 +6,7 @@ import pe.edu.pucp.cineflow.modelo.usuario.Usuario;
 public interface IUsuarioBo extends IGestionable<Usuario> {
     Usuario obtenerPorEmail(String email);
     void cambiarContrasenia(int idUsuario, String contraseniaActual, String nuevaContrasenia);
+    void restablecerContrasenia(String email, String nuevaContrasenia);
     void actualizarPerfil(int idUsuario, String nombre, String apellidos, String telefono, java.time.LocalDate fechaNacimiento);
     Usuario autenticar(String email, String contrasenia);
 }

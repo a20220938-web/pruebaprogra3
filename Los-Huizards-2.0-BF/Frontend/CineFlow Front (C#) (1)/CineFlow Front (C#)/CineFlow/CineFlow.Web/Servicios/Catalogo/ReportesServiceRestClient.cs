@@ -15,11 +15,22 @@ public class ReportesServiceRestClient : IReportesServiceClient
         _options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
     }
 
-    public async Task<ReporteVentasPeliculaViewModel?> ObtenerVentasPorPeliculaAsync(int idPelicula)
+    public async Task<ReporteVentasPeliculaViewModel?> ObtenerVentasPorPeliculaAsync(int idPelicula, DateTime? fechaInicio = null, DateTime? fechaFin = null)
     {
         try
         {
-            return await _httpClient.GetFromJsonAsync<ReporteVentasPeliculaViewModel>($"v1/reportes/ventas/pelicula/{idPelicula}", _options);
+            var url = $"v1/reportes/ventas/pelicula/{idPelicula}";
+            var queryParams = new List<string>();
+
+            if (fechaInicio.HasValue)
+                queryParams.Add($"fechaInicio={fechaInicio.Value:yyyy-MM-dd}");
+            if (fechaFin.HasValue)
+                queryParams.Add($"fechaFin={fechaFin.Value:yyyy-MM-dd}");
+
+            if (queryParams.Count > 0)
+                url += "?" + string.Join("&", queryParams);
+
+            return await _httpClient.GetFromJsonAsync<ReporteVentasPeliculaViewModel>(url, _options);
         }
         catch
         {

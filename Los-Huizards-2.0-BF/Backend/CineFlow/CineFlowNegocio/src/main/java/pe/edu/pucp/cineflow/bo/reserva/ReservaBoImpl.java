@@ -84,6 +84,25 @@ public class ReservaBoImpl extends BaseBo implements IReservaBo {
                 if (id <= 0)
                     throw new IllegalStateException("No se pudo crear la reserva");
                 modelo.setIdReserva(id);
+
+                // Marcar asientos como RESERVADO al crear la reserva.
+                // Si ya están RESERVADO (pre-reservados al avanzar desde selección), se aceptan.
+                List<Asiento> asientos = modelo.getAsientos();
+                if (asientos != null) {
+                    for (Asiento asiento : asientos) {
+                        Asiento dbAsiento = asientoDao.leer(asiento.getIdAsiento());
+                        if (dbAsiento == null)
+                            throw new IllegalStateException("No existe el asiento con id: " + asiento.getIdAsiento());
+                        if (dbAsiento.getEstado() == EstadoAsiento.OCUPADO)
+                            throw new IllegalStateException("El asiento " + asiento.getIdAsiento() + " ya está ocupado");
+                        if (dbAsiento.getEstado() == EstadoAsiento.DISPONIBLE) {
+                            dbAsiento.setEstado(EstadoAsiento.RESERVADO);
+                            if (!asientoDao.actualizar(dbAsiento))
+                                throw new IllegalStateException("No se pudo reservar el asiento id: " + asiento.getIdAsiento());
+                        }
+                        // Si ya está RESERVADO, no se modifica (pre-reservado previamente)
+                    }
+                }
             } else if (estado == Estado.Modificado) {
                 validarIdPositivo(modelo.getIdReserva(), "id de reserva");
                 if (!reservaDao.actualizar(modelo))
@@ -124,11 +143,11 @@ public class ReservaBoImpl extends BaseBo implements IReservaBo {
             if (!reservaDao.actualizar(reserva))
                 throw new IllegalStateException("No se pudo confirmar la reserva");
 
-            // 2. Cambiar estado de cada asiento a RESERVADO
+            // 2. Cambiar estado de cada asiento a OCUPADO
             List<Asiento> asientos = reserva.getAsientos();
             if (asientos != null) {
                 for (Asiento asiento : asientos) {
-                    asiento.setEstado(EstadoAsiento.RESERVADO);
+                    asiento.setEstado(EstadoAsiento.OCUPADO);
                     if (!asientoDao.actualizar(asiento))
                         throw new IllegalStateException(
                                 "No se pudo actualizar el estado del asiento id: "
@@ -155,6 +174,7 @@ public class ReservaBoImpl extends BaseBo implements IReservaBo {
         if (reserva.getEstado() == EstadoReserva.CANCELADA)
             throw new IllegalStateException("La reserva ya está cancelada");
 
+        boolean estabaConfirmada = reserva.getEstado() == EstadoReserva.CONFIRMADA;
         TransactionsManager.iniciarTransaccion();
         try {
             // 1. Cambiar estado de la reserva a CANCELADA
@@ -173,21 +193,28 @@ public class ReservaBoImpl extends BaseBo implements IReservaBo {
                 }
             }
 
-            // 3. Reponer stock de confitería si había productos reservados (RF11)
-            Confiteria confiteria = reserva.getConfiteria();
-            if (confiteria != null && confiteria.getCantidad() > 0
-                    && reserva.getInventario() != null) {
-                InventarioCine inventario = inventarioDao.leer(reserva.getInventario().getIdInventario());
-                if (inventario != null) {
-                    inventario.setStockActual(inventario.getStockActual() + confiteria.getCantidad());
-                    inventarioDao.actualizar(inventario);
-                }
+            // 3. Reponer stock de confitería SOLO si la reserva ya estaba confirmada
+            //    (si estaba PENDIENTE, el stock nunca se descontó)
+            if (estabaConfirmada) {
+                reservaDao.reponerStockConfiteriaPorReserva(idReserva);
             }
 
             TransactionsManager.commitTransaccion();
         } catch (Exception e) {
             TransactionsManager.rollbackTransaccion();
             throw e;
+        }
+    }
+
+    @Override
+    public void expirarReservasVencidasPorFuncion(int idFuncion) {
+        List<Reserva> reservas = reservaDao.leerPorFuncion(idFuncion);
+        for (Reserva r : reservas) {
+            if (r.getEstado() == EstadoReserva.PENDIENTE
+                    && r.getFechaExpiracion() != null
+                    && LocalDateTime.now().isAfter(r.getFechaExpiracion())) {
+                cancelarReserva(r.getIdReserva());
+            }
         }
     }
 
@@ -269,13 +296,18 @@ public class ReservaBoImpl extends BaseBo implements IReservaBo {
         double totalEntradas = 0;
         if (modelo.getEntradas() != null)
             totalEntradas = modelo.getEntradas().stream()
-                    .mapToDouble(e -> e.getPrecioBase())
+                    .mapToDouble(e -> e.calcularPrecio())
                     .sum();
 
         double totalConfiteria = 0;
         if (modelo.getConfiteria() != null)
             totalConfiteria = modelo.getConfiteria().getPrecioUnitario()
                     * modelo.getConfiteria().getCantidad();
+
+        // Sumar también la lista de snacks (confiterias) seleccionados en la reserva
+        if (modelo.getConfiterias() != null)
+            for (pe.edu.pucp.cineflow.modelo.reserva.ArticuloIndividual c : modelo.getConfiterias())
+                totalConfiteria += c.getPrecioUnitario() * c.getCantidad();
 
         return totalEntradas + totalConfiteria;
     }

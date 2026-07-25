@@ -7,6 +7,9 @@ import pe.edu.pucp.cineflow.bo.reporte.IReporteVentasBo;
 import pe.edu.pucp.cineflow.bo.reporte.ReporteVentasBoImpl;
 import pe.edu.pucp.cineflow.modelo.reporte.ReporteVentasPorPelicula;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Map;
 
 @Path("/v1/reportes")
@@ -20,15 +23,29 @@ public class ReportesResource {
         this.reporteBo = new ReporteVentasBoImpl();
     }
 
-    // RF17 - Reporte de ventas por película (con filtro opcional de cine)
+    // RF17 - Reporte de ventas por película (con filtro opcional de cine y rango de fechas)
     @GET
     @Path("ventas/pelicula/{idPelicula}")
     public Response reporteVentasPorPelicula(
             @PathParam("idPelicula") int idPelicula,
-            @QueryParam("idCine") Integer idCine) {
+            @QueryParam("idCine") Integer idCine,
+            @QueryParam("fechaInicio") String fechaInicioStr,
+            @QueryParam("fechaFin") String fechaFinStr) {
 
         try {
-            ReporteVentasPorPelicula reporte = reporteBo.generarPorPelicula(idPelicula, idCine);
+            LocalDateTime fechaInicio = null;
+            LocalDateTime fechaFin = null;
+
+            if (fechaInicioStr != null && !fechaInicioStr.isEmpty()) {
+                LocalDate date = LocalDate.parse(fechaInicioStr);
+                fechaInicio = date.atStartOfDay();
+            }
+            if (fechaFinStr != null && !fechaFinStr.isEmpty()) {
+                LocalDate date = LocalDate.parse(fechaFinStr);
+                fechaFin = date.atTime(LocalTime.MAX);
+            }
+
+            ReporteVentasPorPelicula reporte = reporteBo.generarPorPelicula(idPelicula, idCine, fechaInicio, fechaFin);
             return Response.ok(reporte).build();
         } catch (IllegalArgumentException e) {
             return Response.status(Response.Status.NOT_FOUND)

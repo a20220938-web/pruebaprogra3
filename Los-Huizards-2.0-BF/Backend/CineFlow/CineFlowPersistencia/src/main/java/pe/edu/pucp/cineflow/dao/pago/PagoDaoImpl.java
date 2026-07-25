@@ -27,9 +27,10 @@ public class PagoDaoImpl extends DefaultBaseDao<Pago> implements IPagoDao {
     protected PreparedStatement comandoActualizar(Connection conn,
                                                   Pago modelo) throws SQLException {
         CallableStatement cmd = conn.prepareCall(
-                "{call modificarPago(?, ?, ?)}");
+                "{call modificarPago(?, ?, ?, ?)}");
         cmd.setString("p_estado", modelo.getEstado().name());
         cmd.setDouble("p_monto",  modelo.getMonto());
+        cmd.setString("p_metodo", modelo.getMetodo().name());
         cmd.setInt("p_id",        modelo.getIdPago());
         return cmd;
     }

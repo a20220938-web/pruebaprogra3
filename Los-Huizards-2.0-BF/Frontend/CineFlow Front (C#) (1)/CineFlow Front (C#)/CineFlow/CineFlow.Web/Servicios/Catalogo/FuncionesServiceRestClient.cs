@@ -59,4 +59,47 @@ public class FuncionesServiceRestClient : IFuncionesServiceClient
             return new List<AsientoViewModel>();
         }
     }
+
+    public async Task<FuncionViewModel?> CrearAsync(FuncionViewModel funcion)
+    {
+        var sendOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, PropertyNameCaseInsensitive = true };
+        sendOptions.Converters.Add(new IsoDateTimeConverter());
+        var response = await _httpClient.PostAsJsonAsync("v1/funciones", funcion, sendOptions);
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadFromJsonAsync<FuncionViewModel>(_options);
+        }
+        else
+        {
+            var error = await response.Content.ReadAsStringAsync();
+            throw new Exception($"[API Error]: {error}");
+        }
+    }
+
+    public async Task<bool> ActualizarAsync(int id, FuncionViewModel funcion)
+    {
+        var sendOptions = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, PropertyNameCaseInsensitive = true };
+        sendOptions.Converters.Add(new IsoDateTimeConverter());
+        var response = await _httpClient.PutAsJsonAsync($"v1/funciones/{id}", funcion, sendOptions);
+        return response.IsSuccessStatusCode;
+    }
+
+    private class IsoDateTimeConverter : System.Text.Json.Serialization.JsonConverter<DateTime>
+    {
+        public override DateTime Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            return DateTime.Parse(reader.GetString()!);
+        }
+
+        public override void Write(Utf8JsonWriter writer, DateTime value, JsonSerializerOptions options)
+        {
+            writer.WriteStringValue(value.ToString("yyyy-MM-ddTHH:mm:ss"));
+        }
+    }
+
+    public async Task<bool> EliminarAsync(int id)
+    {
+        var response = await _httpClient.DeleteAsync($"v1/funciones/{id}");
+        return response.IsSuccessStatusCode;
+    }
 }

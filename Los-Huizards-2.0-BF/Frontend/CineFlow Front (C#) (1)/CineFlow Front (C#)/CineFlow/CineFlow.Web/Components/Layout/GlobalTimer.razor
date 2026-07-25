@@ -2,9 +2,11 @@
 @using Microsoft.AspNetCore.Components.Routing
 @using CineFlow.Web.Servicios.Reserva
 @implements IDisposable
+@implements IAsyncDisposable
 @inject NavigationManager NavigationManager
 @inject BookingState BookingState
 @inject IReservasServiceClient ReservasService
+@inject CineFlow.Web.Servicios.User.UserState UserState
 
 @if (IsVisible && _reservationDeadline.HasValue)
 {
@@ -28,7 +30,7 @@
 @code {
     private Timer? _timer;
     private DateTime? _reservationDeadline;
-    private bool IsVisible => NavigationManager.Uri.Contains("/seats/") && !NavigationManager.Uri.Contains("/ticket/");
+    private bool IsVisible => UserState.IsLoggedIn && NavigationManager.Uri.Contains("/seats/") && !NavigationManager.Uri.Contains("/ticket/");
 
     protected override void OnInitialized()
     {
@@ -45,7 +47,7 @@
     {
         bool isResFlow = url.Contains("/seats/") && !url.Contains("/ticket/");
         
-        if (isResFlow && _reservationDeadline == null)
+        if (isResFlow && _reservationDeadline == null && UserState.IsLoggedIn)
         {
             // Start 5-minute timer
             _reservationDeadline = DateTime.Now.AddMinutes(5);
@@ -53,13 +55,20 @@
         }
         else if (!isResFlow && _reservationDeadline != null)
         {
-            // Cancel timer y liberar reserva si no fue a ticket (pago exitoso)
-            if (BookingState.IdReserva > 0 && !url.Contains("/ticket/"))
+            // Cancel timer y liberar si no fue a ticket (pago exitoso)
+            if (!url.Contains("/ticket/"))
             {
-                await ReservasService.CancelarReservaAsync(BookingState.IdReserva);
+                if (BookingState.IdReserva > 0)
+                {
+                    await ReservasService.CancelarReservaAsync(BookingState.IdReserva);
+                }
+                else if (BookingState.PreReservedSeats.Any())
+                {
+                    await ReservasService.LiberarAsientosAsync(BookingState.PreReservedSeats);
+                }
                 BookingState.Clear();
             }
-            
+
             _reservationDeadline = null;
             _timer?.Dispose();
             _timer = null;
@@ -82,10 +91,14 @@
                 
                 await InvokeAsync(async () =>
                 {
-                    // Cancela la reserva en backend si existe (libera asientos RESERVADO → DISPONIBLE)
+                    // Cancela la reserva si existe, o libera asientos pre-reservados
                     if (BookingState.IdReserva > 0)
                     {
                         await ReservasService.CancelarReservaAsync(BookingState.IdReserva);
+                    }
+                    else if (BookingState.PreReservedSeats.Any())
+                    {
+                        await ReservasService.LiberarAsientosAsync(BookingState.PreReservedSeats);
                     }
 
                     // Limpia el booking state
@@ -111,5 +124,29 @@
     {
         NavigationManager.LocationChanged -= HandleLocationChanged;
         _timer?.Dispose();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (BookingState.IdReserva > 0)
+            {
+                await ReservasService.CancelarReservaAsync(BookingState.IdReserva);
+                BookingState.Clear();
+            }
+            else if (BookingState.PreReservedSeats.Any())
+            {
+                await ReservasService.LiberarAsientosAsync(BookingState.PreReservedSeats);
+                BookingState.Clear();
+            }
+        }
+        catch
+        {
+            // Si el circuito ya se desconectó, el backend limpiará vía expiración
+        }
+
+        Dispose();
+        GC.SuppressFinalize(this);
     }
 }

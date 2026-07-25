@@ -6,6 +6,9 @@ public class Entrada{
 	private int IdEntrada;
 	private double precioBase;
 	private tipoEntrada tipo;
+
+	@jakarta.json.bind.annotation.JsonbTransient
+	private boolean precioFinalListo = false;
 	
 	public Entrada() {}
 
@@ -13,6 +16,10 @@ public class Entrada{
 	this.IdEntrada = Identrada;
 	this.precioBase = precioBase;
 	this.tipo = tipo;
+	}
+	
+	public void marcarPrecioFinalListo() {
+		this.precioFinalListo = true;
 	}
 	
 	public int getIdEntrada(){
@@ -40,6 +47,7 @@ public class Entrada{
 	}
 	
 	public double calcularPrecio(){
+		if (precioFinalListo) return precioBase;
 		double precio = precioBase;
 		if (tipo == tipoEntrada.NINO) {
 			precio *= 0.7;

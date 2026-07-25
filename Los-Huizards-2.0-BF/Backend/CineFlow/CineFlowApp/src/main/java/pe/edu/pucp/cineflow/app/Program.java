@@ -83,7 +83,7 @@ public class Program {
         p.setDuracion(entre(80, 180));
         p.setSinopsis(pick(sinopsis));
         p.setGenero(pick(Genero.values()));
-        p.setEdadResticcion(pick(restricciones));
+//        p.setEdadResticcion(pick(restricciones));
         return p;
     }
 

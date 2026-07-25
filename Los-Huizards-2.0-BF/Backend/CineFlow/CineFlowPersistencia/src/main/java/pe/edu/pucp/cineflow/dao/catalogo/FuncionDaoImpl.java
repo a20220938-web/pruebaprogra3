@@ -44,6 +44,22 @@ public class FuncionDaoImpl extends DefaultBaseDao<Funcion> implements IFuncionD
     }
 
     @Override
+    public List<Funcion> leerPorSala(int idSala) {
+        return ejecutarComando(conn -> {
+            try (PreparedStatement cmd = conn.prepareStatement(
+                    "SELECT * FROM FUNCION WHERE id_sala = ?;")) {
+                cmd.setInt(1, idSala);
+                ResultSet rs = cmd.executeQuery();
+                List<Funcion> lista = new ArrayList<>();
+                while (rs.next()) lista.add(mapearModelo(rs));
+                return lista;
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    @Override
     protected PreparedStatement comandoCrear(Connection conn, Funcion modelo) throws SQLException {
         if (modelo.getPelicula() == null) throw new IllegalArgumentException("Pelicula es obligatoria");
         if (modelo.getSala() == null) throw new IllegalArgumentException("Sala es obligatoria");

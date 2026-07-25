@@ -9,26 +9,34 @@
 <PageTitle>Confitería - CineFlow</PageTitle>
 
 <div class="container py-5 text-body">
-    <h2 class="fw-bold mb-4">Agrega tus Snacks</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">Agrega tus Snacks</h2>
+        <CancelReservation MovieId="@MovieId" />
+    </div>
     
     <div class="row">
         <div class="col-md-8">
             <div class="row row-cols-1 row-cols-md-2 g-4">
-                @foreach (var snack in AvailableSnacks)
+                @foreach (var snack in AvailableSnacks.Where(s => s.Cantidad > 0))
                 {
+                    var qty = GetQuantity(snack);
+                    var stockBajo = snack.Cantidad <= 5;
                     <div class="col">
                         <div class="card h-100 bg-body-tertiary text-body border-secondary">
                             <div class="card-body">
                                 <h5 class="card-title fw-bold">@snack.Nombre</h5>
-                                <p class="card-text text-muted small">@snack.Descripcion</p>
-                                <p class="text-danger fw-bold fs-5">S/ @snack.PrecioUnitario</p>
-                                
+                                <p class="card-text text-body-secondary small">@snack.Descripcion</p>
+                                <p class="text-danger fw-bold fs-5">S/ @snack.PrecioUnitario.ToString("0.00")</p>
+                                <p class="small fw-semibold @(stockBajo ? "text-warning" : "text-body-secondary")">
+                                    Stock disponible: @snack.Cantidad
+                                </p>
+
                                 <div class="d-flex justify-content-between align-items-center mt-3">
-                                    <button class="btn btn-outline-light btn-sm" @onclick="() => UpdateQuantity(snack, -1)" disabled="@(GetQuantity(snack) == 0)">
+                                    <button class="btn btn-outline-secondary btn-sm text-body" @onclick="() => UpdateQuantity(snack, -1)" disabled="@(qty == 0)">
                                         <i class="bi bi-dash"></i>
                                     </button>
-                                    <span class="fw-bold fs-5">@GetQuantity(snack)</span>
-                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => UpdateQuantity(snack, 1)">
+                                    <span class="fw-bold fs-5 text-body">@qty</span>
+                                    <button class="btn btn-outline-danger btn-sm" @onclick="() => UpdateQuantity(snack, 1)" disabled="@(qty >= snack.Cantidad)">
                                         <i class="bi bi-plus"></i>
                                     </button>
                                 </div>
@@ -48,7 +56,7 @@
                     <h6>Snacks Seleccionados:</h6>
                     @if (!BookingState.SelectedSnacks.Any())
                     {
-                        <p class="text-muted small">No has seleccionado snacks.</p>
+                        <p class="text-body-secondary small">No has seleccionado snacks.</p>
                     }
                     else
                     {
@@ -59,7 +67,7 @@
                                 if (snackDetails != null)
                                 {
                                     <li class="d-flex justify-content-between mb-2">
-                                        <span>@snackDetails.Nombre (x@item.Value)</span>
+                                        <span>@snackDetails.Nombre (@item.Value x)</span>
                                         <span>S/ @((snackDetails.PrecioUnitario * item.Value).ToString("0.00"))</span>
                                     </li>
                                 }
@@ -100,11 +108,27 @@
             NavigationManager.NavigateTo($"/login?returnUrl=/movies/{MovieId}/seats/{FuncionId}/snacks", forceLoad: false);
             return;
         }
-        if (!BookingState.AvailableSnacks.Any())
+        // Siempre carga fresco para reflejar el stock real del cine asociado a la función
+        var cineId = BookingState.CurrentFuncion?.Sala?.Cine?.Id ?? 0;
+        if (cineId > 0)
         {
-            BookingState.AvailableSnacks = await ConfiteriaService.ListarAsync();
+            BookingState.AvailableSnacks = await ConfiteriaService.ListarPorCineAsync(cineId) ?? new();
+        }
+        else
+        {
+            BookingState.AvailableSnacks = await ConfiteriaService.ListarAsync() ?? new();
         }
         AvailableSnacks = BookingState.AvailableSnacks;
+
+        // Ajustar selecciones previas si el stock bajó
+        foreach (var key in BookingState.SelectedSnacks.Keys.ToList())
+        {
+            var item = AvailableSnacks.FirstOrDefault(s => s.IdItem == key);
+            if (item == null || item.Cantidad == 0)
+                BookingState.SelectedSnacks.Remove(key);
+            else if (BookingState.SelectedSnacks[key] > item.Cantidad)
+                BookingState.SelectedSnacks[key] = item.Cantidad;
+        }
     }
 
     private int GetQuantity(ConfiteriaViewModel snack)
@@ -114,17 +138,15 @@
 
     private void UpdateQuantity(ConfiteriaViewModel snack, int change)
     {
-        if (!BookingState.SelectedSnacks.ContainsKey(snack.IdItem))
+        var newQty = GetQuantity(snack) + change;
+
+        if (newQty <= 0)
         {
-            if (change > 0) BookingState.SelectedSnacks[snack.IdItem] = change;
+            BookingState.SelectedSnacks.Remove(snack.IdItem);
         }
-        else
+        else if (newQty <= snack.Cantidad)
         {
-            BookingState.SelectedSnacks[snack.IdItem] += change;
-            if (BookingState.SelectedSnacks[snack.IdItem] <= 0)
-            {
-                BookingState.SelectedSnacks.Remove(snack.IdItem);
-            }
+            BookingState.SelectedSnacks[snack.IdItem] = newQty;
         }
     }
 

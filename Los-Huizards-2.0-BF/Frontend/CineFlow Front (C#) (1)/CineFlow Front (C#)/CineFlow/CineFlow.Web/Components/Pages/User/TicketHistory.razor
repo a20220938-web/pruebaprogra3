@@ -5,14 +5,16 @@
 @using CineFlow.Web.ViewModels.Reserva
 @inject IReservasServiceClient ReservasService
 @inject CineFlow.Web.Servicios.User.UserState UserState
+@inject CineFlow.Web.Servicios.Reserva.ReservasCacheService ReservasCache
 @inject NavigationManager NavigationManager
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
 
 <PageTitle>Mis Entradas - CineFlow</PageTitle>
 
 <div class="container py-5 mt-4">
     <div class="text-center mb-5">
         <h1 class="fw-bold text-body">Mis Entradas</h1>
-        <p class="text-muted">Historial de tus próximas funciones y películas vistas</p>
+        <p class="text-body-secondary">Historial de tus próximas funciones y películas vistas</p>
     </div>
 
     <div class="row justify-content-center">
@@ -27,22 +29,22 @@
             }
             else if (reservas.Count == 0)
             {
-                <p class="text-center text-muted">No tienes reservas registradas.</p>
+                <p class="text-center text-body-secondary">No tienes reservas registradas.</p>
             }
             else
             {
                 @foreach (var reserva in reservas.OrderByDescending(r => r.FechaReserva))
                 {
                     var isPast       = reserva.Funcion?.FechaHora < DateTime.Now;
-                    var isCancelable = !isPast
-                                       && reserva.Estado != "CANCELADA"
-                                       && reserva.Estado != "CONFIRMADA_PAGO";
                     var peliculaTitulo = reserva.Funcion?.Pelicula?.Titulo ?? "Película Desconocida";
                     var fechaString    = reserva.Funcion?.FechaHora.ToString("dd MMMM, yyyy") ?? "Fecha no disponible";
                     var horaString     = reserva.Funcion?.FechaHora.ToString("HH:mm") ?? "";
-                    var salaStr        = reserva.Funcion?.Sala?.Id.ToString() ?? "N/A";
+                    var cineNombre     = reserva.Funcion?.Sala?.Cine?.Nombre ?? "CineFlow";
+                    var salaStr        = reserva.Funcion?.Sala?.Numero.ToString() ?? "N/A";
                     var asientosStr    = string.Join(", ", reserva.Asientos?.Select(a => $"{a.Fila}{a.Numero}") ?? Array.Empty<string>());
-                    var cancelando     = cancelandoId == reserva.IdReserva;
+                    
+                    var realTotal = (reserva.Entradas?.Sum(e => e.PrecioBase) ?? 0) + (reserva.Confiterias?.Sum(c => c.PrecioUnitario * c.Cantidad) ?? 0);
+                    if (realTotal == 0) realTotal = reserva.TotalFinal;
 
                     <div class="card bg-body-tertiary @(reserva.Estado == "CANCELADA" ? "border-secondary border-opacity-25 opacity-60" : isPast ? "border-secondary border-opacity-50 opacity-75" : "border-danger border-2 shadow-lg") rounded-4 mb-4 overflow-hidden">
                         <div class="row g-0">
@@ -55,43 +57,31 @@
                                         @(reserva.Estado == "CANCELADA" ? "Cancelada" : isPast ? "Vista" : "Próximamente")
                                     </span>
                                     <h4 class="card-title fw-bold">@peliculaTitulo</h4>
-                                    <p class="card-text mb-1"><i class="bi bi-calendar3 me-2 text-muted"></i> @fechaString</p>
+                                    <p class="card-text mb-1"><i class="bi bi-calendar3 me-2 text-body-secondary"></i> @fechaString</p>
                                     @if (!isPast)
                                     {
-                                        <p class="card-text mb-1"><i class="bi bi-clock me-2 text-muted"></i> @horaString hrs</p>
+                                        <p class="card-text mb-1"><i class="bi bi-clock me-2 text-body-secondary"></i> @horaString hrs</p>
                                     }
-                                    <p class="card-text mb-0"><i class="bi bi-geo-alt me-2 text-muted"></i> Sala @salaStr - Asientos @asientosStr</p>
-                                    <p class="card-text mt-2 mb-0 fw-bold text-danger">Total: S/ @reserva.TotalFinal.ToString("0.00")</p>
+                                    <p class="card-text mb-0"><i class="bi bi-geo-alt me-2 text-body-secondary"></i> @cineNombre - Sala @salaStr - Asientos @asientosStr</p>
                                 </div>
                             </div>
                             <div class="col-md-3 d-flex flex-column align-items-center justify-content-center p-4 border-start border-secondary border-opacity-25 gap-2">
                                 @if (reserva.Estado == "CANCELADA")
                                 {
-                                    <span class="text-muted small text-center">Reserva cancelada</span>
+                                    <span class="text-body-secondary small text-center">Reserva cancelada</span>
                                 }
                                 else if (!isPast)
                                 {
                                     <div class="bg-white p-2 rounded mb-1">
                                         <i class="bi bi-qr-code text-dark" style="font-size: 3rem;"></i>
                                     </div>
-                                    <a href="/ticket/@reserva.IdReserva" class="btn btn-sm btn-outline-danger fw-bold rounded-pill w-100">Ver Entrada</a>
-
-                                    @if (isCancelable)
-                                    {
-                                        <button class="btn btn-sm btn-outline-secondary rounded-pill w-100"
-                                                disabled="@cancelando"
-                                                @onclick="() => CancelarReserva(reserva.IdReserva)">
-                                            @if (cancelando)
-                                            {
-                                                <span class="spinner-border spinner-border-sm me-1"></span>
-                                            }
-                                            Cancelar
-                                        </button>
-                                    }
+                                    <a href="@($"{ReportesBase}comprobante?id={reserva.IdReserva}")" target="_blank"
+                                       class="btn btn-sm btn-outline-primary fw-bold rounded-pill w-100">Descargar comprobante (PDF)</a>
                                 }
                                 else
                                 {
-                                    <button class="btn btn-sm btn-secondary fw-bold rounded-pill w-100">Calificar</button>
+                                    <a href="@($"{ReportesBase}comprobante?id={reserva.IdReserva}")" target="_blank"
+                                       class="btn btn-sm btn-outline-primary fw-bold rounded-pill w-100">Descargar comprobante (PDF)</a>
                                 }
                             </div>
                         </div>
@@ -103,9 +93,11 @@
 </div>
 
 @code {
+    // Base del modulo de reportes (PDF). Configurable por appsettings: "ReportesUrl".
+    private string ReportesBase => Configuration["ReportesUrl"] ?? "http://localhost:8080/CineFlowReportes/reportes/";
+
     private List<ReservaViewModel> reservas = new();
     private bool isLoading = true;
-    private int cancelandoId = 0;
 
     protected override async Task OnInitializedAsync()
     {
@@ -114,9 +106,24 @@
             NavigationManager.NavigateTo("/login?returnUrl=/mis-reservas", forceLoad: false);
             return;
         }
+
+        if (ReservasCache.HasCachedData)
+        {
+            reservas = ReservasCache.GetCached()!;
+            isLoading = false;
+            StateHasChanged();
+        }
+
+        _ = CargarReservasAsync();
+    }
+
+    private async Task CargarReservasAsync()
+    {
         try
         {
-            reservas = await ReservasService.ListarPorUsuarioAsync(UserState.UserId!.Value);
+            var data = await ReservasService.ListarPorUsuarioAsync(UserState.UserId!.Value);
+            reservas = data;
+            ReservasCache.Set(data);
         }
         catch (Exception ex)
         {
@@ -125,24 +132,8 @@
         finally
         {
             isLoading = false;
+            StateHasChanged();
         }
     }
 
-    private async Task CancelarReserva(int idReserva)
-    {
-        cancelandoId = idReserva;
-        try
-        {
-            var ok = await ReservasService.CancelarReservaAsync(idReserva);
-            if (ok)
-            {
-                var r = reservas.FirstOrDefault(x => x.IdReserva == idReserva);
-                if (r != null) r.Estado = "CANCELADA";
-            }
-        }
-        finally
-        {
-            cancelandoId = 0;
-        }
-    }
 }

@@ -10,4 +10,7 @@ public interface IFuncionesServiceClient
     Task<FuncionViewModel?> ObtenerAsync(int id);
     Task<List<FuncionViewModel>> ListarPorPeliculaAsync(int idPelicula);
     Task<List<AsientoViewModel>> ListarAsientosAsync(int idFuncion);
+    Task<FuncionViewModel?> CrearAsync(FuncionViewModel funcion);
+    Task<bool> ActualizarAsync(int id, FuncionViewModel funcion);
+    Task<bool> EliminarAsync(int id);
 }

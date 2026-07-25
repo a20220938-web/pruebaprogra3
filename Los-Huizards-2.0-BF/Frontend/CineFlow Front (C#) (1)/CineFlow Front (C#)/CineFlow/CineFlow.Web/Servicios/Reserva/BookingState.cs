@@ -10,6 +10,7 @@ public class BookingState
     public Dictionary<int, string> TicketTypes { get; set; } = new(); // seatId -> type (REGULAR, NIÑO, CONADIS)
     public Dictionary<int, int> SelectedSnacks { get; set; } = new(); // snackId -> quantity
     public int IdReserva { get; set; }
+    public List<int> PreReservedSeats { get; set; } = new();
 
     // Cache the loaded snacks
     public List<ConfiteriaViewModel> AvailableSnacks { get; set; } = new();
@@ -21,5 +22,6 @@ public class BookingState
         TicketTypes.Clear();
         SelectedSnacks.Clear();
         IdReserva = 0;
+        PreReservedSeats.Clear();
     }
 }

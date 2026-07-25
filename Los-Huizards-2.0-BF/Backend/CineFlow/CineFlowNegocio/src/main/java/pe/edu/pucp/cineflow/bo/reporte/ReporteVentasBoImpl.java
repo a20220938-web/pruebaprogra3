@@ -12,6 +12,7 @@ import pe.edu.pucp.cineflow.modelo.reporte.ReporteVentasPorPelicula;
 import pe.edu.pucp.cineflow.modelo.reserva.EstadoReserva;
 import pe.edu.pucp.cineflow.modelo.reserva.Reserva;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -21,9 +22,9 @@ public class ReporteVentasBoImpl implements IReporteVentasBo {
     private final IFuncionDao  funcionDao  = new FuncionDaoImpl();
     private final IReservaDao  reservaDao  = new ReservaDaoImpl();
 
-    // RF17 - Reporte de ventas por película (con filtro opcional de cine)
+    // RF17 - Reporte de ventas por película (con filtro opcional de cine y rango de fechas)
     @Override
-    public ReporteVentasPorPelicula generarPorPelicula(int idPelicula, Integer idCine) {
+    public ReporteVentasPorPelicula generarPorPelicula(int idPelicula, Integer idCine, LocalDateTime fechaInicio, LocalDateTime fechaFin) {
         Pelicula pelicula = peliculaDao.leer(idPelicula);
         if (pelicula == null)
             throw new IllegalArgumentException("No existe la película con id: " + idPelicula);
@@ -46,6 +47,8 @@ public class ReporteVentasBoImpl implements IReporteVentasBo {
             List<Reserva> reservasFuncion = reservaDao.leerPorFuncion(funcion.getId());
             reservasFuncion.stream()
                     .filter(r -> r.getEstado() == EstadoReserva.CONFIRMADA)
+                    .filter(r -> fechaInicio == null || (r.getFechaReserva() != null && !r.getFechaReserva().isBefore(fechaInicio)))
+                    .filter(r -> fechaFin == null || (r.getFechaReserva() != null && !r.getFechaReserva().isAfter(fechaFin)))
                     .forEach(reporte::agregarReserva);
         }
 

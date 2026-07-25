@@ -23,7 +23,12 @@ public class PeliculaBoImpl extends BaseBo implements IPeliculaBo {
 
     @Override
     public List<Pelicula> listar() {
-        return peliculaDao.leerTodos();
+        pe.edu.pucp.cineflow.dao.TransactionsManager.iniciarTransaccion();
+        try {
+            return peliculaDao.leerTodos();
+        } finally {
+            pe.edu.pucp.cineflow.dao.TransactionsManager.commitTransaccion();
+        }
     }
 
     @Override
@@ -71,41 +76,45 @@ public class PeliculaBoImpl extends BaseBo implements IPeliculaBo {
                 .collect(Collectors.toList());
     }
 
-    // RF05 - Búsqueda y filtrado: filtra en memoria combinando películas y funciones
     @Override
     public List<Pelicula> buscar(String nombre, String cine, LocalDate fecha, Genero genero) {
-        List<Pelicula> todas = peliculaDao.leerTodos();
+        pe.edu.pucp.cineflow.dao.TransactionsManager.iniciarTransaccion();
+        try {
+            List<Pelicula> todas = peliculaDao.leerTodos();
 
-        // Si hay filtro de cine o fecha, obtenemos los ids de película que tienen funciones que coincidan
-        Set<Integer> idsPorFuncion = null;
-        if ((cine != null && !cine.isBlank()) || fecha != null) {
-            List<Funcion> funciones = fecha != null
-                    ? funcionDao.leerPorFecha(fecha)
-                    : funcionDao.leerTodos();
+            // Si hay filtro de cine o fecha, obtenemos los ids de película que tienen funciones que coincidan
+            Set<Integer> idsPorFuncion = null;
+            if ((cine != null && !cine.isBlank()) || fecha != null) {
+                List<Funcion> funciones = fecha != null
+                        ? funcionDao.leerPorFecha(fecha)
+                        : funcionDao.leerTodos();
 
-            if (cine != null && !cine.isBlank()) {
-                final String cineLower = cine.toLowerCase();
-                funciones = funciones.stream()
-                        .filter(f -> f.getSala() != null
-                                && f.getSala().getCine() != null
-                                && f.getSala().getCine().getNombre() != null
-                                && f.getSala().getCine().getNombre().toLowerCase().contains(cineLower))
-                        .collect(Collectors.toList());
+                if (cine != null && !cine.isBlank()) {
+                    final String cineLower = cine.toLowerCase();
+                    funciones = funciones.stream()
+                            .filter(f -> f.getSala() != null
+                                    && f.getSala().getCine() != null
+                                    && f.getSala().getCine().getNombre() != null
+                                    && f.getSala().getCine().getNombre().toLowerCase().contains(cineLower))
+                            .collect(Collectors.toList());
+                }
+
+                idsPorFuncion = funciones.stream()
+                        .filter(f -> f.getPelicula() != null)
+                        .map(f -> f.getPelicula().getId())
+                        .collect(Collectors.toSet());
             }
 
-            idsPorFuncion = funciones.stream()
-                    .filter(f -> f.getPelicula() != null)
-                    .map(f -> f.getPelicula().getId())
-                    .collect(Collectors.toSet());
+            final Set<Integer> idsValidos = idsPorFuncion;
+
+            return todas.stream()
+                    .filter(p -> nombre == null || nombre.isBlank()
+                            || p.getTitulo().toLowerCase().contains(nombre.toLowerCase()))
+                    .filter(p -> genero == null || p.getGenero() == genero)
+                    .filter(p -> idsValidos == null || idsValidos.contains(p.getId()))
+                    .collect(Collectors.toList());
+        } finally {
+            pe.edu.pucp.cineflow.dao.TransactionsManager.commitTransaccion();
         }
-
-        final Set<Integer> idsValidos = idsPorFuncion;
-
-        return todas.stream()
-                .filter(p -> nombre == null || nombre.isBlank()
-                        || p.getTitulo().toLowerCase().contains(nombre.toLowerCase()))
-                .filter(p -> genero == null || p.getGenero() == genero)
-                .filter(p -> idsValidos == null || idsValidos.contains(p.getId()))
-                .collect(Collectors.toList());
     }
 }

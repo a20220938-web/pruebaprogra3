@@ -31,6 +31,7 @@ public class ReservaDaoImpl extends DefaultBaseDao<Reserva> implements IReservaD
                 crearEntradas(conn, idReserva, modelo.getEntradas());
                 crearAsientosReserva(conn, idReserva, modelo.getAsientos());
                 crearConfiteriaReserva(conn, idReserva, modelo.getConfiteria());
+                crearConfiteriasReserva(conn, idReserva, modelo.getConfiterias());
                 return idReserva;
             } catch (Exception e) {
                 throw new RuntimeException(e);
@@ -184,7 +185,7 @@ public class ReservaDaoImpl extends DefaultBaseDao<Reserva> implements IReservaD
             try {
                 List<Object[]> filas = new ArrayList<>();
                 try (PreparedStatement cmd = conn.prepareStatement(
-                        "SELECT * FROM RESERVA WHERE fid_usuario = ?;")) {
+                        "SELECT * FROM RESERVA WHERE fid_usuario = ? ORDER BY fechaReserva DESC;")) {
                     cmd.setInt(1, idUsuario);
                     ResultSet rs = cmd.executeQuery();
                     while (rs.next()) {
@@ -216,6 +217,37 @@ public class ReservaDaoImpl extends DefaultBaseDao<Reserva> implements IReservaD
                     reservas.add(r);
                 }
                 return reservas;
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    @Override
+    public Reserva leerPorPago(int idPago) {
+        return ejecutarComando(conn -> {
+            try {
+                try (PreparedStatement cmd = conn.prepareStatement(
+                        "SELECT * FROM RESERVA WHERE fid_pago = ? LIMIT 1;")) {
+                    cmd.setInt(1, idPago);
+                    ResultSet rs = cmd.executeQuery();
+                    if (rs.next()) {
+                        Reserva r = new Reserva();
+                        r.setIdReserva(leerEntero(rs, "idReserva"));
+                        r.setEstado(EstadoReserva.valueOf(leerTexto(rs, "estado")));
+                        r.setTotalFinal(leerDecimal(rs, "totalFinal"));
+                        r.setFechaReserva(leerFecha(rs, "fechaReserva"));
+                        r.setFechaExpiracion(leerFecha(rs, "fechaExpiracion"));
+                        int uid = leerEnteroNullable(rs, "fid_usuario");
+                        int pid = leerEnteroNullable(rs, "fid_pago");
+                        r.setUsuario(uid > 0 ? new UsuarioDaoImpl().leer(uid) : null);
+                        r.setPago(pid > 0 ? new PagoDaoImpl().leer(pid) : null);
+                        r.setEntradas(leerEntradas(conn, r.getIdReserva()));
+                        r.setAsientos(leerAsientos(conn, r.getIdReserva()));
+                        return r;
+                    }
+                }
+                return null;
             } catch (SQLException e) {
                 throw new RuntimeException(e);
             }
@@ -345,7 +377,7 @@ public class ReservaDaoImpl extends DefaultBaseDao<Reserva> implements IReservaD
             try (PreparedStatement cmd = conn.prepareStatement(
                     "INSERT INTO entrada (tipo, precio_base, id_reserva) VALUES (?, ?, ?);")) {
                 cmd.setString(1, entrada.getTipo().name());
-                cmd.setDouble(2, entrada.getPrecioBase());
+                cmd.setDouble(2, entrada.calcularPrecio());
                 cmd.setInt(3, idReserva);
                 cmd.executeUpdate();
             }
@@ -370,8 +402,10 @@ public class ReservaDaoImpl extends DefaultBaseDao<Reserva> implements IReservaD
 
         List<Entrada> entradas = new ArrayList<>(filas.size());
         for (Object[] f : filas) {
-            entradas.add(new Entrada((int) f[0], (double) f[1],
-                    tipoEntrada.valueOf((String) f[2])));
+            Entrada e = new Entrada((int) f[0], (double) f[1],
+                    tipoEntrada.valueOf((String) f[2]));
+            e.marcarPrecioFinalListo();
+            entradas.add(e);
         }
         return entradas;
     }
@@ -387,13 +421,53 @@ public class ReservaDaoImpl extends DefaultBaseDao<Reserva> implements IReservaD
                 cmd.setInt(2, asiento.getIdAsiento());
                 cmd.executeUpdate();
             }
-            try (PreparedStatement cmd = conn.prepareStatement(
-                    "UPDATE asiento SET id_estado_asiento = 3 WHERE id_asiento = ?;")) {
-                cmd.setInt(1, asiento.getIdAsiento());
-                cmd.executeUpdate();
-            }
+            // El estado del asiento es responsabilidad del BO, no del DAO
         }
     }
+    @Override
+    public void descontarStockConfiteriaPorReserva(int idReserva) {
+        ajustarStockConfiteria(idReserva, true);
+    }
+
+    @Override
+    public void reponerStockConfiteriaPorReserva(int idReserva) {
+        ajustarStockConfiteria(idReserva, false);
+    }
+
+    // Ajusta el stock de cada producto de la reserva y recalcula
+    // inventario_cine.stock_actual = SUMA de CONFITERIA.cantidad por inventario.
+    private void ajustarStockConfiteria(int idReserva, boolean descontar) {
+        ejecutarComando(conn -> {
+            String op = descontar
+                    ? "UPDATE CONFITERIA SET cantidad = GREATEST(cantidad - ?, 0) WHERE id_item = ?;"
+                    : "UPDATE CONFITERIA SET cantidad = cantidad + ? WHERE id_item = ?;";
+            try {
+                try (PreparedStatement sel = conn.prepareStatement(
+                        "SELECT id_item, cantidad FROM RESERVA_CONFITERIA WHERE id_reserva = ?;")) {
+                    sel.setInt(1, idReserva);
+                    try (ResultSet rs = sel.executeQuery();
+                         PreparedStatement upd = conn.prepareStatement(op)) {
+                        while (rs.next()) {
+                            upd.setInt(1, rs.getInt("cantidad"));
+                            upd.setInt(2, rs.getInt("id_item"));
+                            upd.addBatch();
+                        }
+                        upd.executeBatch();
+                    }
+                }
+                try (PreparedStatement rec = conn.prepareStatement(
+                        "UPDATE inventario_cine ic SET ic.stock_actual = " +
+                        "(SELECT COALESCE(SUM(c.cantidad),0) FROM CONFITERIA c " +
+                        " WHERE c.id_inventario = ic.id_inventario);")) {
+                    rec.executeUpdate();
+                }
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+            return null;
+        });
+    }
+
     private void crearConfiteriaReserva(Connection conn, int idReserva,
                                         Confiteria confiteria) throws SQLException {
         if (confiteria == null) return;
@@ -405,6 +479,25 @@ public class ReservaDaoImpl extends DefaultBaseDao<Reserva> implements IReservaD
             cmd.setInt(3, confiteria.getCantidad());
             cmd.setDouble(4, confiteria.getPrecioUnitario());
             cmd.executeUpdate();
+        }
+    }
+
+    // NUEVO: inserta varios snacks (la confiteria seleccionada en la reserva)
+    private void crearConfiteriasReserva(Connection conn, int idReserva,
+                                         List<ArticuloIndividual> confiterias) throws SQLException {
+        if (confiterias == null || confiterias.isEmpty()) return;
+        try (PreparedStatement cmd = conn.prepareStatement(
+                "INSERT INTO RESERVA_CONFITERIA (id_reserva, id_item, cantidad, precio_unitario) " +
+                        "VALUES (?, ?, ?, ?);")) {
+            for (ArticuloIndividual c : confiterias) {
+                if (c == null || c.getCantidad() <= 0) continue;
+                cmd.setInt(1, idReserva);
+                cmd.setInt(2, c.getIdItem());
+                cmd.setInt(3, c.getCantidad());
+                cmd.setDouble(4, c.getPrecioUnitario());
+                cmd.addBatch();
+            }
+            cmd.executeBatch();
         }
     }
     private List<Asiento> leerAsientos(Connection conn,

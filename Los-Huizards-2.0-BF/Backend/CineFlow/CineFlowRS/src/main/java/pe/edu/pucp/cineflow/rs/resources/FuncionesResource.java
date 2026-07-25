@@ -112,11 +112,21 @@ public class FuncionesResource {
                     .entity(Map.of("error", "El payload de funcion es invalido"))
                     .build();
         }
-        funcionBo.guardar(funcion, Estado.Nuevo);
-        URI location = uriInfo.getAbsolutePathBuilder()
-                .path(String.valueOf(funcion.getId()))
-                .build();
-        return Response.created(location).entity(funcion).build();
+        try {
+            funcionBo.guardar(funcion, Estado.Nuevo);
+            URI location = uriInfo.getAbsolutePathBuilder()
+                    .path(String.valueOf(funcion.getId()))
+                    .build();
+            return Response.created(location).entity(funcion).build();
+        } catch (IllegalArgumentException | IllegalStateException | NullPointerException e) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", e.getMessage() != null ? e.getMessage() : e.toString()))
+                    .build();
+        } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of("error", "Error interno al guardar: " + e.getMessage()))
+                    .build();
+        }
     }
 
     @PUT
@@ -132,8 +142,19 @@ public class FuncionesResource {
                     .entity(Map.of("error", "El payload de funcion es invalido"))
                     .build();
         }
-        funcionBo.guardar(funcion, Estado.Modificado);
-        return Response.ok(funcion).build();
+        funcion.setId(id);
+        try {
+            funcionBo.guardar(funcion, Estado.Modificado);
+            return Response.ok(funcion).build();
+        } catch (IllegalArgumentException | IllegalStateException | NullPointerException e) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", e.getMessage() != null ? e.getMessage() : e.toString()))
+                    .build();
+        } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of("error", "Error interno al actualizar: " + e.getMessage()))
+                    .build();
+        }
     }
 
     @DELETE

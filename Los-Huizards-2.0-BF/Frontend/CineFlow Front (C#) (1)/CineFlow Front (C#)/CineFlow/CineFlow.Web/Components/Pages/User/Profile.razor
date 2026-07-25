@@ -17,7 +17,7 @@
                             <div class="spinner-border text-danger" role="status">
                                 <span class="visually-hidden">Loading...</span>
                             </div>
-                            <p class="mt-3 text-muted">Cargando perfil...</p>
+                            <p class="mt-3 text-body-secondary">Cargando perfil...</p>
                         </div>
                     }
                     else if (userProfile != null)
@@ -32,47 +32,47 @@
 
                         <ul class="list-group list-group-flush bg-transparent border-secondary border-opacity-50 rounded-3 mb-4">
                             <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center py-3 border-secondary border-opacity-50">
-                                <span class="text-muted small fw-semibold">Correo Electrónico</span>
+                                <span class="text-body-secondary small fw-semibold">Correo Electrónico</span>
                                 <span class="fw-bold">@userProfile.Email</span>
                             </li>
                             <li class="list-group-item bg-transparent py-3 border-secondary border-opacity-50">
                                 @if (!isEditing)
                                 {
                                     <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <span class="text-muted small fw-semibold">Teléfono</span>
+                                        <span class="text-body-secondary small fw-semibold">Teléfono</span>
                                         <span class="fw-bold">@(string.IsNullOrEmpty(userProfile.Telefono) ? "No especificado" : userProfile.Telefono)</span>
                                     </div>
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <span class="text-muted small fw-semibold">Fecha de Nacimiento</span>
+                                        <span class="text-body-secondary small fw-semibold">Fecha de Nacimiento</span>
                                         <span class="fw-bold">@(userProfile.FechaNacimiento.HasValue ? userProfile.FechaNacimiento.Value.ToString("dd/MM/yyyy") : "No especificada")</span>
                                     </div>
                                 }
                                 else
                                 {
                                     <div class="mb-2">
-                                        <label class="form-label text-muted small fw-semibold">Teléfono</label>
-                                        <input type="text" class="form-control bg-body text-body" @bind="editTelefono" placeholder="Escribe tu número..." />
+                                        <label class="form-label text-body-secondary small fw-semibold">Teléfono</label>
+                                        <input type="tel" class="form-control bg-body text-body" @bind="editTelefono" placeholder="9XXXXXXXX" maxlength="9" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
                                     </div>
                                     <div class="mb-2">
-                                        <label class="form-label text-muted small fw-semibold">Fecha de Nacimiento</label>
-                                        <input type="date" class="form-control bg-body text-body" @bind="editFechaNacimiento" />
+                                        <label class="form-label text-body-secondary small fw-semibold">Fecha de Nacimiento</label>
+                                        <input type="date" class="form-control bg-body text-body" @bind="editFechaNacimiento" max="@DateTime.Now.ToString("yyyy-MM-dd")" />
                                     </div>
                                     <div class="mb-2">
-                                        <label class="form-label text-muted small fw-semibold">Nombre</label>
+                                        <label class="form-label text-body-secondary small fw-semibold">Nombre</label>
                                         <input type="text" class="form-control bg-body text-body" @bind="editNombre" />
                                     </div>
                                     <div class="mb-2">
-                                        <label class="form-label text-muted small fw-semibold">Apellidos</label>
+                                        <label class="form-label text-body-secondary small fw-semibold">Apellidos</label>
                                         <input type="text" class="form-control bg-body text-body" @bind="editApellido" />
                                     </div>
                                 }
                             </li>
                             <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center py-3 border-secondary border-opacity-50">
-                                <span class="text-muted small fw-semibold">Miembro desde</span>
+                                <span class="text-body-secondary small fw-semibold">Miembro desde</span>
                                 <span class="fw-bold">@userProfile.FechaRegistro.ToString("dd MMMM yyyy")</span>
                             </li>
                             <li class="list-group-item bg-transparent d-flex justify-content-between align-items-center py-3 border-secondary border-opacity-50">
-                                <span class="text-muted small fw-semibold">ID de Usuario</span>
+                                <span class="text-body-secondary small fw-semibold">ID de Usuario</span>
                                 <span class="fw-bold">#@userProfile.Id</span>
                             </li>
                         </ul>

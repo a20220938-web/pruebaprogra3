@@ -9,4 +9,5 @@ import java.util.List;
 public interface IFuncionDao extends IPersistible<Funcion, Integer> {
     List<Funcion> leerPorPelicula(int idPelicula);
     List<Funcion> leerPorFecha(LocalDate fecha);
+    List<Funcion> leerPorSala(int idSala);
 }

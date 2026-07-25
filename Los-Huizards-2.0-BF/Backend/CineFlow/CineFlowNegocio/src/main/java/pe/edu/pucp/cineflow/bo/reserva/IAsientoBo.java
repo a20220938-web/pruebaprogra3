@@ -9,4 +9,6 @@ import java.util.List;
 public interface IAsientoBo extends IGestionable<Asiento> {
     List<Asiento> listarPorFuncion(int idFuncion);
     void cambiarEstado(int idAsiento, EstadoAsiento nuevoEstado);
+    void preReservarLote(List<Integer> idsAsientos);
+    void liberarLote(List<Integer> idsAsientos);
 }

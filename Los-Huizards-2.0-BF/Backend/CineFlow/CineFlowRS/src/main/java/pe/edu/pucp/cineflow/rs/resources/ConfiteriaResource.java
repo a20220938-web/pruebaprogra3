@@ -127,4 +127,51 @@ public class ConfiteriaResource {
         confiteriaBo.eliminar(id);
         return Response.noContent().build();
     }
+
+    // Descuenta stock de un artículo al confirmar compra
+    @POST
+    @Path("{id}/descontar")
+    public Response descontarStock(@PathParam("id") int id, Map<String, Integer> body) {
+        int cantidad = body != null && body.containsKey("cantidad") ? body.get("cantidad") : 0;
+        if (cantidad <= 0) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "La cantidad a descontar debe ser mayor a 0"))
+                    .build();
+        }
+        ArticuloIndividual articulo = confiteriaBo.obtener(id);
+        if (articulo == null) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(Map.of("error", "Articulo con id " + id + " no encontrado"))
+                    .build();
+        }
+        if (articulo.getCantidad() < cantidad) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(Map.of("error", "Stock insuficiente. Disponible: " + articulo.getCantidad()))
+                    .build();
+        }
+        articulo.setCantidad(articulo.getCantidad() - cantidad);
+        confiteriaBo.guardar(articulo, Estado.Modificado);
+        return Response.ok(Map.of("stockRestante", articulo.getCantidad())).build();
+    }
+
+    // Restaura stock de un artículo al cancelar reserva
+    @POST
+    @Path("{id}/restaurar")
+    public Response restaurarStock(@PathParam("id") int id, Map<String, Integer> body) {
+        int cantidad = body != null && body.containsKey("cantidad") ? body.get("cantidad") : 0;
+        if (cantidad <= 0) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "La cantidad a restaurar debe ser mayor a 0"))
+                    .build();
+        }
+        ArticuloIndividual articulo = confiteriaBo.obtener(id);
+        if (articulo == null) {
+            return Response.status(Response.Status.NOT_FOUND)
+                    .entity(Map.of("error", "Articulo con id " + id + " no encontrado"))
+                    .build();
+        }
+        articulo.setCantidad(articulo.getCantidad() + cantidad);
+        confiteriaBo.guardar(articulo, Estado.Modificado);
+        return Response.ok(Map.of("stockRestante", articulo.getCantidad())).build();
+    }
 }

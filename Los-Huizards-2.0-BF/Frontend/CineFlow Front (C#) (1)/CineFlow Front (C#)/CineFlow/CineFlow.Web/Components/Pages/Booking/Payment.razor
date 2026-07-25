@@ -1,20 +1,25 @@
 @page "/movies/{MovieId}/seats/{FuncionId}/payment"
+@using System.Threading.Tasks
 @using CineFlow.Web.Servicios.Reserva
 @using CineFlow.Web.ViewModels.Catalogo
 @using CineFlow.Web.ViewModels.Reserva
 @inject NavigationManager NavigationManager
 @inject BookingState BookingState
 @inject IReservasServiceClient ReservasService
+@inject IConfiteriaServiceClient ConfiteriaService
 @inject CineFlow.Web.Servicios.User.UserState UserState
 
 <PageTitle>Pago - CineFlow</PageTitle>
 
 <div class="container py-5">
-    <h2 class="fw-bold mb-4 text-danger">Finaliza tu Compra</h2>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0 text-danger">Finaliza tu Compra</h2>
+        <CancelReservation MovieId="@MovieId" />
+    </div>
     
     <div class="row">
         <div class="col-md-7">
-            <div class="card shadow-sm border-0 mb-4 bg-white">
+            <div class="card shadow-sm border-secondary mb-4 bg-body">
                 <div class="card-body p-4">
                     <h5 class="card-title fw-bold mb-4 text-body"><i class="bi bi-wallet2 me-2 text-danger"></i>Método de Pago</h5>
                     
@@ -23,10 +28,10 @@
                         <label class="btn btn-outline-danger fw-bold" for="btnCreditCard"><i class="bi bi-credit-card me-2"></i>Tarjeta</label>
 
                         <input type="radio" class="btn-check" name="paymentMethod" id="btnYape" autocomplete="off" checked="@(paymentMethod == "Yape")" @onchange="@(() => paymentMethod = "Yape")">
-                        <label class="btn btn-outline-primary fw-bold text-dark" for="btnYape" style="background-color: #E2E3E5; border-color: #702b89;"><span style="color: #702b89;"><i class="bi bi-qr-code-scan me-2"></i>Yape</span></label>
+                        <label class="btn fw-bold" for="btnYape" style="border: 2px solid #702b89; color: #702b89;"><i class="bi bi-qr-code-scan me-2"></i>Yape</label>
 
                         <input type="radio" class="btn-check" name="paymentMethod" id="btnPlin" autocomplete="off" checked="@(paymentMethod == "Plin")" @onchange="@(() => paymentMethod = "Plin")">
-                        <label class="btn btn-outline-info fw-bold text-dark" for="btnPlin" style="background-color: #E2E3E5; border-color: #00b2e3;"><span style="color: #00b2e3;"><i class="bi bi-qr-code-scan me-2"></i>Plin</span></label>
+                        <label class="btn fw-bold" for="btnPlin" style="border: 2px solid #00b2e3; color: #00b2e3;"><i class="bi bi-qr-code-scan me-2"></i>Plin</label>
                     </div>
                     
                     <form @onsubmit="ProcessPayment" @onsubmit.preventDefault="true">
@@ -34,56 +39,115 @@
                         {
                             <div class="mb-3">
                                 <label class="form-label text-secondary fw-semibold">Número de Tarjeta</label>
-                                <input type="text" class="form-control border-secondary bg-body-tertiary text-body shadow-sm" placeholder="0000 0000 0000 0000" required>
+                                <input type="text"
+                                       class="@CardFieldClass("cardNumber")"
+                                       placeholder="0000 0000 0000 0000"
+                                       maxlength="19"
+                                       inputmode="numeric"
+                                       onkeydown="if(!/[0-9]/.test(event.key)&&!['Backspace','Delete','Tab','ArrowLeft','ArrowRight','Home','End'].includes(event.key)&&!event.ctrlKey&&!event.metaKey)event.preventDefault();"
+                                       value="@cardNumber"
+                                       @oninput="OnCardNumberInput" />
+                                @if (fieldErrors.ContainsKey("cardNumber"))
+                                {
+                                    <div class="invalid-feedback">@fieldErrors["cardNumber"]</div>
+                                }
                             </div>
                             <div class="row">
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label text-secondary fw-semibold">Fecha de Expiración</label>
-                                    <input type="text" class="form-control border-secondary bg-body-tertiary text-body shadow-sm" placeholder="MM/YY" required>
+                                    <input type="text"
+                                           class="@CardFieldClass("expiry")"
+                                           placeholder="MM/YY"
+                                           maxlength="5"
+                                           inputmode="numeric"
+                                           onkeydown="if(!/[0-9]/.test(event.key)&&!['Backspace','Delete','Tab','ArrowLeft','ArrowRight','Home','End'].includes(event.key)&&!event.ctrlKey&&!event.metaKey)event.preventDefault();"
+                                           value="@cardExpiry"
+                                           @oninput="OnExpiryInput" />
+                                    @if (fieldErrors.ContainsKey("expiry"))
+                                    {
+                                        <div class="invalid-feedback">@fieldErrors["expiry"]</div>
+                                    }
                                 </div>
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label text-secondary fw-semibold">CVV</label>
-                                    <input type="text" class="form-control border-secondary bg-body-tertiary text-body shadow-sm" placeholder="123" required>
+                                    <input type="password"
+                                           class="@CardFieldClass("cvv")"
+                                           placeholder="123"
+                                           maxlength="4"
+                                           inputmode="numeric"
+                                           onkeydown="if(!/[0-9]/.test(event.key)&&!['Backspace','Delete','Tab','ArrowLeft','ArrowRight','Home','End'].includes(event.key)&&!event.ctrlKey&&!event.metaKey)event.preventDefault();"
+                                           value="@cardCvv"
+                                           @oninput="OnCvvInput" />
+                                    @if (fieldErrors.ContainsKey("cvv"))
+                                    {
+                                        <div class="invalid-feedback">@fieldErrors["cvv"]</div>
+                                    }
                                 </div>
                             </div>
                             <div class="mb-4">
                                 <label class="form-label text-secondary fw-semibold">Nombre en la Tarjeta</label>
-                                <input type="text" class="form-control border-secondary bg-body-tertiary text-body shadow-sm" placeholder="Juan Pérez" required>
+                                <input type="text"
+                                       class="@CardFieldClass("cardName")"
+                                       placeholder="Juan Pérez"
+                                       value="@cardName"
+                                       @oninput="OnCardNameInput" />
+                                @if (fieldErrors.ContainsKey("cardName"))
+                                {
+                                    <div class="invalid-feedback">@fieldErrors["cardName"]</div>
+                                }
                             </div>
                         }
                         else if (paymentMethod == "Yape")
                         {
                             <div class="text-center mb-4">
-                                <h6 class="fw-bold text-dark mb-3">Escanea el QR para pagar con Yape</h6>
+                                <h6 class="fw-bold text-body mb-3">Escanea el QR para pagar con Yape</h6>
                                 <div class="p-3 bg-white rounded shadow-sm d-inline-block border mb-3" style="border-color: #702b89 !important; border-width: 2px !important;">
-                                    <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg" alt="QR Yape" style="width: 150px; height: 150px;">
+                                    <img src="/images/yape-qr.jpg" alt="QR Yape" style="width: 150px; height: 150px;">
                                 </div>
                                 <p class="mb-1 text-secondary">A nombre de: <strong>Nano Banana</strong></p>
                                 <p class="mb-4 fs-5 fw-bold" style="color: #702b89;">999 888 777</p>
-                                
+
                                 <div class="text-start">
                                     <label class="form-label text-secondary fw-semibold">Tu Número de Celular (Yape)</label>
-                                    <input type="text" class="form-control border-secondary bg-body-tertiary text-body shadow-sm" placeholder="9XX XXX XXX" required>
+                                    <input type="text"
+                                           class="@CardFieldClass("phone")"
+                                           placeholder="9XX XXX XXX"
+                                           maxlength="9"
+                                           value="@phoneNumber"
+                                           @oninput="OnPhoneInput" />
+                                    @if (fieldErrors.ContainsKey("phone"))
+                                    {
+                                        <div class="invalid-feedback">@fieldErrors["phone"]</div>
+                                    }
                                 </div>
                             </div>
                         }
                         else if (paymentMethod == "Plin")
                         {
                             <div class="text-center mb-4">
-                                <h6 class="fw-bold text-dark mb-3">Escanea el QR para pagar con Plin</h6>
+                                <h6 class="fw-bold text-body mb-3">Escanea el QR para pagar con Plin</h6>
                                 <div class="p-3 bg-white rounded shadow-sm d-inline-block border mb-3" style="border-color: #00b2e3 !important; border-width: 2px !important;">
-                                    <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg" alt="QR Plin" style="width: 150px; height: 150px;">
+                                    <img src="/images/plin-qr.jpg" alt="QR Plin" style="width: 150px; height: 150px;">
                                 </div>
                                 <p class="mb-1 text-secondary">A nombre de: <strong>Nano Banana</strong></p>
                                 <p class="mb-4 fs-5 fw-bold" style="color: #00b2e3;">999 888 777</p>
-                                
+
                                 <div class="text-start">
                                     <label class="form-label text-secondary fw-semibold">Tu Número de Celular (Plin)</label>
-                                    <input type="text" class="form-control border-secondary bg-body-tertiary text-body shadow-sm" placeholder="9XX XXX XXX" required>
+                                    <input type="text"
+                                           class="@CardFieldClass("phone")"
+                                           placeholder="9XX XXX XXX"
+                                           maxlength="9"
+                                           value="@phoneNumber"
+                                           @oninput="OnPhoneInput" />
+                                    @if (fieldErrors.ContainsKey("phone"))
+                                    {
+                                        <div class="invalid-feedback">@fieldErrors["phone"]</div>
+                                    }
                                 </div>
                             </div>
                         }
-                        
+
                         @if (!string.IsNullOrEmpty(errorMsg))
                         {
                             <div class="alert alert-danger mt-3">@errorMsg</div>
@@ -100,25 +164,29 @@
                                 <span>@(paymentMethod == "Card" ? "Pagar con Tarjeta" : paymentMethod == "Yape" ? "Confirmar Yapeo" : "Confirmar Plin")</span>
                             }
                         </button>
+                        <button type="button" class="btn btn-outline-secondary w-100 fw-bold py-2 mt-2" disabled="@isProcessing" @onclick="GoBack">
+                            <i class="bi bi-arrow-left me-2"></i>Regresar a Confitería
+                        </button>
                     </form>
                 </div>
             </div>
         </div>
         
         <div class="col-md-5">
-            <div class="card border-danger shadow-lg bg-white">
-                <div class="card-header bg-danger text-body py-3">
+            <div class="card border-danger shadow-lg bg-body">
+                <div class="card-header bg-danger text-white py-3">
                     <h5 class="card-title fw-bold m-0"><i class="bi bi-receipt me-2"></i>Resumen del Pedido</h5>
                 </div>
                 <div class="card-body p-4">
                     @if (Funcion != null)
                     {
-                        <p class="mb-1 text-dark"><strong>Película:</strong> @Funcion.Pelicula?.Titulo</p>
-                        <p class="mb-1 text-dark"><strong>Cine:</strong> @Funcion.Sala?.Id (Demo)</p>
-                        <p class="mb-3 text-dark"><strong>Fecha:</strong> @Funcion.FechaHora.ToString("dd/MM/yyyy HH:mm")</p>
-                        
+                        <p class="mb-1 text-body"><strong>Película:</strong> @Funcion.Pelicula?.Titulo</p>
+                        <p class="mb-1 text-body"><strong>Sala:</strong> @Funcion.Sala?.Numero</p>
+                        <p class="mb-1 text-body"><strong>Sede:</strong> @Funcion.Sala?.Cine?.Nombre</p>
+                        <p class="mb-3 text-body"><strong>Fecha:</strong> @Funcion.FechaHora.ToString("dd/MM/yyyy HH:mm")</p>
+
                         <hr class="border-secondary opacity-50" />
-                        
+
                         <h6 class="fw-bold text-danger">Entradas (@BookingState.SelectedSeats.Count asientos)</h6>
                         @foreach (var seatId in BookingState.SelectedSeats)
                         {
@@ -129,9 +197,9 @@
                                 _ => Funcion.PrecioBase
                             };
                             var asientoLabel = Funcion.MapaAsientos?.FirstOrDefault(a => a.IdAsiento == seatId)?.Label ?? seatId.ToString();
-                            <p class="d-flex justify-content-between text-secondary mb-1">
+                            <p class="d-flex justify-content-between text-body-secondary mb-1">
                                 <span>1 x @type (Asiento @asientoLabel)</span>
-                                <span class="text-dark fw-semibold">S/ @price.ToString("0.00")</span>
+                                <span class="text-body fw-semibold">S/ @price.ToString("0.00")</span>
                             </p>
                         }
 
@@ -143,18 +211,18 @@
                                 var snackDetails = BookingState.AvailableSnacks.FirstOrDefault(s => s.IdItem == snack.Key);
                                 if (snackDetails != null)
                                 {
-                                    <p class="d-flex justify-content-between text-secondary mb-1">
+                                    <p class="d-flex justify-content-between text-body-secondary mb-1">
                                         <span>@snack.Value x @snackDetails.Nombre</span>
-                                        <span class="text-dark fw-semibold">S/ @((snackDetails.PrecioUnitario * snack.Value).ToString("0.00"))</span>
+                                        <span class="text-body fw-semibold">S/ @((snackDetails.PrecioUnitario * snack.Value).ToString("0.00"))</span>
                                     </p>
                                 }
                             }
                         }
-                        
+
                         <hr class="border-danger opacity-75 mt-4" />
-                        
-                        <div class="bg-light p-3 rounded d-flex justify-content-between align-items-center border border-danger border-opacity-25 mt-3">
-                            <span class="fs-5 fw-bold text-dark">Total a Pagar:</span>
+
+                        <div class="bg-body-secondary p-3 rounded d-flex justify-content-between align-items-center border border-danger border-opacity-25 mt-3">
+                            <span class="fs-5 fw-bold text-body">Total a Pagar:</span>
                             <span class="fs-4 fw-bold text-danger">S/ @GetGranTotal().ToString("0.00")</span>
                         </div>
                     }
@@ -248,6 +316,103 @@
     private bool isProcessing = false;
     private string errorMsg = string.Empty;
 
+    // Campos del formulario
+    private string cardNumber = string.Empty;
+    private string cardExpiry = string.Empty;
+    private string cardCvv = string.Empty;
+    private string cardName = string.Empty;
+    private string phoneNumber = string.Empty;
+    private Dictionary<string, string> fieldErrors = new Dictionary<string, string>();
+
+    private string CardFieldClass(string key)
+    {
+        var invalid = fieldErrors.ContainsKey(key) ? " is-invalid" : string.Empty;
+        return "form-control border-secondary bg-body-tertiary text-body shadow-sm" + invalid;
+    }
+
+    private void OnCardNumberInput(ChangeEventArgs e)
+    {
+        var raw = e.Value != null ? e.Value.ToString() : string.Empty;
+        var digits = new string(System.Linq.Enumerable.Where(raw, char.IsDigit).ToArray());
+        if (digits.Length > 16) digits = digits.Substring(0, 16);
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < digits.Length; i++)
+        {
+            if (i > 0 && i % 4 == 0) sb.Append(' ');
+            sb.Append(digits[i]);
+        }
+        cardNumber = sb.ToString();
+    }
+
+    private void OnExpiryInput(ChangeEventArgs e)
+    {
+        var raw = e.Value != null ? e.Value.ToString() : string.Empty;
+        var digits = new string(System.Linq.Enumerable.Where(raw, char.IsDigit).ToArray());
+        if (digits.Length > 4) digits = digits.Substring(0, 4);
+        cardExpiry = digits.Length >= 2 ? digits.Substring(0, 2) + "/" + digits.Substring(2) : digits;
+    }
+
+    private void OnCvvInput(ChangeEventArgs e)
+    {
+        var raw = e.Value != null ? e.Value.ToString() : string.Empty;
+        var digits = new string(System.Linq.Enumerable.Where(raw, char.IsDigit).ToArray());
+        cardCvv = digits.Length > 4 ? digits.Substring(0, 4) : digits;
+    }
+
+    private void OnCardNameInput(ChangeEventArgs e)
+    {
+        var raw = e.Value?.ToString() ?? string.Empty;
+        cardName = new string(raw.Where(c => char.IsLetter(c) || c == ' ' || c == '\'' || c == '-').ToArray());
+    }
+
+    private void OnPhoneInput(ChangeEventArgs e)
+    {
+        var raw = e.Value != null ? e.Value.ToString() : string.Empty;
+        var digits = new string(System.Linq.Enumerable.Where(raw, char.IsDigit).ToArray());
+        phoneNumber = digits.Length > 9 ? digits.Substring(0, 9) : digits;
+    }
+
+    private bool ValidateForm()
+    {
+        fieldErrors.Clear();
+
+        if (paymentMethod == "Card")
+        {
+            var digits = new string(System.Linq.Enumerable.Where(cardNumber, char.IsDigit).ToArray());
+            if (digits.Length != 16)
+                fieldErrors["cardNumber"] = "El número de tarjeta debe tener 16 dígitos.";
+
+            if (!System.Text.RegularExpressions.Regex.IsMatch(cardExpiry, @"^(0[1-9]|1[0-2])\/\d{2}$"))
+            {
+                fieldErrors["expiry"] = "Formato inválido. Usa MM/YY.";
+            }
+            else
+            {
+                var parts = cardExpiry.Split('/');
+                int month = int.Parse(parts[0]);
+                int year = 2000 + int.Parse(parts[1]);
+                var expDate = new DateTime(year, month, 1).AddMonths(1);
+                if (expDate <= DateTime.Now)
+                    fieldErrors["expiry"] = "La tarjeta está vencida.";
+            }
+
+            var cvvDigits = new string(System.Linq.Enumerable.Where(cardCvv, char.IsDigit).ToArray());
+            if (cvvDigits.Length < 3 || cvvDigits.Length > 4)
+                fieldErrors["cvv"] = "El CVV debe tener 3 o 4 dígitos.";
+
+            if (string.IsNullOrWhiteSpace(cardName) || cardName.Trim().Length < 3)
+                fieldErrors["cardName"] = "Ingresa el nombre tal como aparece en la tarjeta.";
+        }
+        else
+        {
+            var phoneDigits = new string(System.Linq.Enumerable.Where(phoneNumber, char.IsDigit).ToArray());
+            if (phoneDigits.Length != 9 || phoneDigits[0] != '9')
+                fieldErrors["phone"] = "Ingresa un número celular peruano válido (9 dígitos, empieza con 9).";
+        }
+
+        return fieldErrors.Count == 0;
+    }
+
     private ReservaViewModel BuildReservaPayload(string metodoPago, double total) =>
         new ReservaViewModel
         {
@@ -275,11 +440,42 @@
                 var type     = BookingState.TicketTypes.GetValueOrDefault(s, "REGULAR");
                 var javaType = type == "NIÑO" ? "NINO" : type;
                 return new EntradaViewModel { PrecioBase = Funcion!.PrecioBase, Tipo = javaType };
-            }).ToList()
+            }).ToList(),
+
+            Confiterias = BookingState.SelectedSnacks
+                .Where(kv => kv.Value > 0)
+                .Select(kv =>
+                {
+                    var d = BookingState.AvailableSnacks.FirstOrDefault(s => s.IdItem == kv.Key);
+                    return new ConfiteriaReservaViewModel
+                    {
+                        IdItem = kv.Key,
+                        Nombre = d?.Nombre ?? string.Empty,
+                        Cantidad = kv.Value,
+                        PrecioUnitario = d?.PrecioUnitario ?? 0,
+                        Categoria = d?.Categoria ?? string.Empty,
+                        IdInventario = d?.IdInventario ?? 0
+                    };
+                }).ToList()
         };
+
+    private async Task GoBack()
+    {
+        if (idReserva > 0)
+        {
+            try { await ReservasService.CancelarReservaAsync(idReserva); } catch { }
+            BookingState.IdReserva = 0;
+            idReserva = 0;
+            idPago = 0;
+            reservaCreada = false;
+        }
+        NavigationManager.NavigateTo($"/movies/{MovieId}/seats/{FuncionId}/snacks");
+    }
 
     private async Task ProcessPayment()
     {
+        if (!ValidateForm()) return;
+
         if (!reservaCreada || idPago <= 0)
         {
             errorMsg = "Los asientos aún no están reservados. Recarga la página e intenta de nuevo.";
@@ -290,8 +486,24 @@
         errorMsg = string.Empty;
         try
         {
-            // Paso 1: Procesar el pago (PENDIENTE → APROBADO o FALLIDO)
-            var resultado = await ReservasService.ProcesarPagoAsync(idPago);
+            // Simular fallo para número de prueba en Yape/Plin
+        if (paymentMethod != "Card" && phoneNumber == "987654321")
+        {
+            errorMsg = "El pago fue rechazado. Verifica tu número de Yape/Plin e intenta de nuevo.";
+            isProcessing = false;
+            return;
+        }
+
+        // Paso 0: Registrar el método de pago elegido por el usuario
+            // (Tarjeta -> TARJETA; Yape/Plin -> BILLETERA_DIGITAL)
+            var metodoBackend = paymentMethod == "Card" ? "TARJETA" : "BILLETERA_DIGITAL";
+            await ReservasService.ActualizarMetodoPagoAsync(idPago, metodoBackend, GetGranTotal());
+
+            // Paso 1: Procesar el pago con Stripe (tarjeta) o simulado (Yape/Plin)
+            var metodoBackendProcesar = paymentMethod == "Card" ? "TARJETA" : "BILLETERA_DIGITAL";
+            var resultado = await ReservasService.ProcesarPagoAsync(
+                idPago, metodoBackendProcesar,
+                cardNumber, cardExpiry, cardCvv);
             if (resultado == null)
             {
                 errorMsg = "Error al conectar con el procesador de pagos. Intenta de nuevo.";
@@ -300,11 +512,7 @@
 
             if (!resultado.Aprobado)
             {
-                // Pago rechazado → cancelar reserva para liberar asientos (RESERVADO → DISPONIBLE)
-                await ReservasService.CancelarReservaAsync(idReserva);
-                BookingState.IdReserva = 0;
-                reservaCreada = false;
-                errorMsg = "El pago fue rechazado. Los asientos han sido liberados. Puedes intentarlo de nuevo.";
+                errorMsg = "El pago fue rechazado. Los asientos se liberarán cuando venza el plazo de 5 minutos.";
                 return;
             }
 
@@ -316,8 +524,20 @@
                 return;
             }
 
+            // El stock de confitería ya se descuenta en el backend al confirmar el pago
+            // (PagoBoImpl.confirmarTransaccion -> descontarStockConfiteriaPorReserva).
+            // No se descuenta aquí para evitar el doble descuento.
+
             BookingState.Clear();
             NavigationManager.NavigateTo($"/ticket/{idReserva}");
+        }
+        catch (TaskCanceledException)
+        {
+            errorMsg = "El pago está tardando más de lo esperado. No se cerró la operación — verifica el estado en tu historial antes de reintentar.";
+        }
+        catch (HttpRequestException ex)
+        {
+            errorMsg = $"Error de conexión con el servidor de pagos: {ex.Message}";
         }
         catch (Exception ex)
         {

@@ -35,7 +35,10 @@ public class AsientoDaoImpl extends DefaultBaseDao<Asiento> implements IAsientoD
                 List<Asiento> lista = new ArrayList<>(filas.size());
                 for (Object[] f : filas) {
                     EstadoAsiento estado = EstadoAsiento.values()[(int) f[3] - 1];
-                    lista.add(new Asiento((int) f[0], (char) f[1], (int) f[2], false, estado, funcion));
+                    char fila = (char) f[1];
+                    int numero = (int) f[2];
+                    boolean esConadis = (fila == 'A' && numero <= 2);
+                    lista.add(new Asiento((int) f[0], fila, numero, esConadis, estado, funcion));
                 }
                 return lista;
             } catch (SQLException e) {
@@ -89,11 +92,15 @@ public class AsientoDaoImpl extends DefaultBaseDao<Asiento> implements IAsientoD
     @Override
     protected Asiento mapearModelo(ResultSet rs) throws SQLException {
         EstadoAsiento estado = EstadoAsiento.values()[leerEntero(rs, "id_estado_asiento") - 1];
+        char fila = leerTexto(rs, "fila").charAt(0);
+        int numero = leerEntero(rs, "numero");
+        boolean esConadis = (fila == 'A' && numero <= 2);
+        
         return new Asiento(
                 leerEntero(rs, "id_asiento"),
-                leerTexto(rs, "fila").charAt(0),
-                leerEntero(rs, "numero"),
-                false,
+                fila,
+                numero,
+                esConadis,
                 estado,
                 null
         );

@@ -85,7 +85,13 @@ public class UsuariosResource {
                     .entity(Map.of("error", "El payload del usuario es invalido"))
                     .build();
         }
-        usuarioBo.guardar(usuario, Estado.Nuevo);
+        try {
+            usuarioBo.guardar(usuario, Estado.Nuevo);
+        } catch (IllegalStateException e) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(Map.of("error", e.getMessage()))
+                    .build();
+        }
         URI location = uriInfo.getAbsolutePathBuilder()
                 .path(String.valueOf(usuario.getIdUsuario()))
                 .build();

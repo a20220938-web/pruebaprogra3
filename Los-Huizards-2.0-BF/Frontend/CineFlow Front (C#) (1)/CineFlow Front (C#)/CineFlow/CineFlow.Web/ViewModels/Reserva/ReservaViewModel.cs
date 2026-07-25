@@ -18,6 +18,19 @@ public class ReservaViewModel
 
     public List<EntradaViewModel> Entradas { get; set; } = new();
     public List<AsientoReservaViewModel> Asientos { get; set; } = new();
+
+    // Snacks seleccionados (se mapean al backend como ArticuloIndividual)
+    public List<ConfiteriaReservaViewModel> Confiterias { get; set; } = new();
+}
+
+public class ConfiteriaReservaViewModel
+{
+    public int IdItem { get; set; }
+    public string Nombre { get; set; } = string.Empty;
+    public int Cantidad { get; set; }
+    public double PrecioUnitario { get; set; }
+    public string Categoria { get; set; } = string.Empty;
+    public int IdInventario { get; set; }
 }
 
 public class PagoReservaViewModel

@@ -82,6 +82,21 @@ public class UsuarioBoImpl extends BaseBo implements IUsuarioBo {
     }
 
     @Override
+    public void restablecerContrasenia(String email, String nuevaContrasenia) {
+        validarTextoObligatorio(email, "email");
+        validarTextoObligatorio(nuevaContrasenia, "nueva contraseña");
+
+        Usuario usuario = usuarioDao.leerPorEmail(email);
+        if (usuario == null)
+            throw new IllegalStateException("No existe un usuario con el email: " + email);
+
+        String nuevoHash = BCrypt.withDefaults().hashToString(12, nuevaContrasenia.toCharArray());
+        usuario.setContrasenia(nuevoHash);
+        if (!usuarioDao.actualizar(usuario))
+            throw new IllegalStateException("No se pudo actualizar la contraseña");
+    }
+
+    @Override
     public void actualizarPerfil(int idUsuario, String nombre, String apellidos, String telefono, java.time.LocalDate fechaNacimiento) {
         validarIdPositivo(idUsuario, "id de usuario");
         validarTextoObligatorio(nombre, "nombre");

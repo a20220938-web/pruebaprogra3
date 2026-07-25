@@ -1,9 +1,13 @@
 @page "/admin/confiteria"
 @using CineFlow.Web.Servicios.Reserva
+@using CineFlow.Web.Servicios.Catalogo
 @using CineFlow.Web.ViewModels.Reserva
+@using CineFlow.Web.ViewModels.Catalogo
 @inject CineFlow.Web.Servicios.User.UserState UserState
 @inject NavigationManager NavigationManager
 @inject IConfiteriaServiceClient ConfiteriaService
+@inject ICinesServiceClient CinesService
+@inject IInventarioServiceClient InventarioService
 
 <PageTitle>Gestión de Confitería - Admin</PageTitle>
 
@@ -18,12 +22,23 @@ else
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
             <h1 class="text-2xl text-foreground mb-2" style="font-size: 1.5rem; font-weight:bold;">Gestión de Confitería</h1>
-            <p class="text-muted-foreground" style="color:gray;">Administra los productos disponibles en la confitería</p>
+            <p class="text-muted-foreground">Administra los productos disponibles en la confitería</p>
           </div>
           <button class="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors" @onclick="() => AbrirModal()">
             <i class="bi bi-plus-lg"></i>
             Nuevo Artículo
           </button>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <label class="fw-semibold mb-0"><i class="bi bi-geo-alt text-primary me-1"></i>Sede:</label>
+          <select class="form-select w-auto" @bind="sedeSeleccionada" @bind:after="CargarArticulos">
+            @foreach (var c in cines)
+            {
+              <option value="@c.Id">@c.Nombre</option>
+            }
+          </select>
+          <span class="text-body-secondary small">Mostrando productos de la sede seleccionada.</span>
         </div>
 
         <div class="bg-card rounded-lg shadow-sm border border-border p-6 mb-8">
@@ -99,7 +114,7 @@ else
                 <div class="modal-content bg-card">
                     <div class="modal-header border-border">
                         <h5 class="modal-title fw-bold text-foreground">@(editando ? "Editar Artículo" : "Nuevo Artículo")</h5>
-                        <button type="button" class="btn-close" @onclick="CerrarModal"></button>
+                        <button type="button" class="btn-close dark:invert" @onclick="CerrarModal"></button>
                     </div>
                     <div class="modal-body">
                         <div class="mb-3">
@@ -146,6 +161,9 @@ else
 
 @code {
     private List<ConfiteriaViewModel> articulos = new();
+    private List<CineViewModel> cines = new();
+    private Dictionary<int, int> cineToInventario = new();
+    private int sedeSeleccionada;
     private bool isLoading = true;
     private bool guardando = false;
     private string errorMsg = "";
@@ -170,13 +188,24 @@ else
             NavigationManager.NavigateTo("/");
             return;
         }
+        try
+        {
+            cines = await CinesService.ListarAsync();
+            var invs = await InventarioService.ListarAsync();
+            cineToInventario = invs.ToDictionary(i => i.IdCine, i => i.IdInventario);
+        }
+        catch { cines = new(); cineToInventario = new(); }
+
+        if (cines.Count > 0) sedeSeleccionada = cines[0].Id;
         await CargarArticulos();
     }
 
     private async Task CargarArticulos()
     {
         isLoading = true;
-        articulos = await ConfiteriaService.ListarAsync();
+        articulos = sedeSeleccionada > 0
+            ? await ConfiteriaService.ListarPorCineAsync(sedeSeleccionada)
+            : await ConfiteriaService.ListarAsync();
         isLoading = false;
     }
 
@@ -206,7 +235,8 @@ else
         else
         {
             editando = false;
-            tempArticulo = new ConfiteriaViewModel { Categoria = "Snack" };
+            int idInv = cineToInventario.TryGetValue(sedeSeleccionada, out var v) ? v : 0;
+            tempArticulo = new ConfiteriaViewModel { Categoria = "Snack", IdInventario = idInv };
         }
         modalAbierto = true;
     }

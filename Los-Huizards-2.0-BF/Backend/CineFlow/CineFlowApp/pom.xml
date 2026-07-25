@@ -6,7 +6,7 @@
     <parent>
         <groupId>pe.edu.pucp.cineflow</groupId>
         <artifactId>CineFlow</artifactId>
-        <version>1.0-SNAPSHOT</version>
+        <version>1.0</version>
     </parent>
 
     <artifactId>CineFlowApp</artifactId>
@@ -26,19 +26,19 @@
         <dependency>
             <groupId>pe.edu.pucp.cineflow</groupId>
             <artifactId>CineFlowDBManager</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <version>1.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>pe.edu.pucp.cineflow</groupId>
             <artifactId>CineFlowNegocio</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <version>1.0</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>pe.edu.pucp.cineflow</groupId>
             <artifactId>CineFlowNegocio</artifactId>
-            <version>1.0-SNAPSHOT</version>
+            <version>1.0</version>
             <scope>compile</scope>
         </dependency>
     </dependencies>

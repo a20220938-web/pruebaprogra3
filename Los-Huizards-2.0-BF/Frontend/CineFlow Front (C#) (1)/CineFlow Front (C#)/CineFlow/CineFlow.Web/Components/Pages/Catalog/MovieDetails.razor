@@ -51,7 +51,8 @@
                     <div class="col">
                         <div class="card h-100 bg-body-tertiary text-body border-secondary">
                             <div class="card-body">
-                                <h5 class="card-title text-danger fw-bold">Sala @(funcion.Sala?.Numero) - @funcion.Formato</h5>
+                                <h5 class="card-title text-danger fw-bold">@(funcion.Sala?.Cine?.Nombre ?? "CineFlow")</h5>
+                                <h6 class="card-subtitle mb-2 text-body-secondary">Sala @(funcion.Sala?.Numero) - @funcion.Formato</h6>
                                 <p class="card-text">
                                     <strong>Fecha:</strong> @funcion.FechaHora.ToString("dd/MM/yyyy HH:mm")<br />
                                     <strong>Precio Base:</strong> S/ @funcion.PrecioBase<br />
@@ -83,7 +84,10 @@
             Pelicula = await PeliculasService.ObtenerAsync(peliculaId);
             if (Pelicula != null)
             {
-                Funciones = await FuncionesService.ListarPorPeliculaAsync(peliculaId) ?? new List<FuncionViewModel>();
+                var todasFunciones = await FuncionesService.ListarPorPeliculaAsync(peliculaId) ?? new List<FuncionViewModel>();
+                var futuras = todasFunciones.Where(f => f.FechaHora >= DateTime.Now).OrderBy(f => f.FechaHora).ToList();
+                // Solo mostramos funciones desde hoy en adelante (no mostrar funciones antiguas)
+                Funciones = futuras;
             }
         }
         isLoading = false;

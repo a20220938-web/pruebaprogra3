@@ -1,6 +1,7 @@
 using CineFlow.Web.ViewModels.Auth;
 using System.Net.Http;
 using System.Net.Http.Json;
+using System.Text.Json;
 
 namespace CineFlow.Web.Servicios.Auth;
 
@@ -49,13 +50,14 @@ public class AuthServiceRestClient : IAuthServiceClient
 
     public async Task<bool> RegisterAsync(RegisterViewModel model)
     {
-        var usuario = new 
-        { 
-            nombre = model.Nombre, 
-            apellidos = model.Apellido, 
-            email = model.Email, 
+        var usuario = new
+        {
+            nombre = model.Nombre,
+            apellidos = model.Apellido,
+            email = model.Email,
             contrasenia = model.Password,
-            telefono = "" // El backend lanza error si esto es nulo al hacer login
+            telefono = model.Telefono,
+            fechaNacimiento = model.FechaNacimiento?.ToString("yyyy-MM-dd")
         };
         try
         {
@@ -64,15 +66,18 @@ public class AuthServiceRestClient : IAuthServiceClient
             {
                 return true;
             }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+            {
+                throw new Exception("El correo ingresado ya está registrado.");
+            }
             else
             {
-                var errorMsg = await response.Content.ReadAsStringAsync();
-                throw new Exception($"Error de API: {response.StatusCode} - {errorMsg}");
+                throw new Exception("No se pudo registrar la cuenta. Intente nuevamente.");
             }
         }
-        catch (Exception ex)
+        catch (Exception) when (true)
         {
-            throw new Exception("Error al registrar: " + ex.Message);
+            throw;
         }
     }
 

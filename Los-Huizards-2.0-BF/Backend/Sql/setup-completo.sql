@@ -341,8 +341,9 @@ END //
 CREATE PROCEDURE modificarPago(
     IN p_estado VARCHAR(30),
     IN p_monto  DECIMAL(10,2),
+    IN p_metodo VARCHAR(40),
     IN p_id     INT)
-BEGIN UPDATE PAGO SET estado = p_estado, monto = p_monto WHERE idPago = p_id; END //
+BEGIN UPDATE PAGO SET estado = p_estado, monto = p_monto, metodo = p_metodo WHERE idPago = p_id; END //
 
 CREATE PROCEDURE eliminarPago(IN p_id INT)
 BEGIN DELETE FROM PAGO WHERE idPago = p_id; END //
@@ -486,12 +487,12 @@ INSERT INTO PELICULA (titulo, duracion, sinopsis, edad_restriccion, genero) VALU
 -- FUNCIONES
 -- id_formato: 1=2D, 2=3D, 3=IMAX
 INSERT INTO FUNCION (id_pelicula, id_sala, fecha_hora, precio_base, id_formato) VALUES
-    (1, 1, '2026-06-22 14:00:00', 18.00, 1),  -- Avengers sala 1 cine 1 (2D)
-    (1, 2, '2026-06-22 17:30:00', 22.00, 2),  -- Avengers sala 2 cine 1 (3D)
-    (2, 1, '2026-06-22 20:00:00', 20.00, 1),  -- Inception sala 1 cine 1 (2D)
-    (3, 3, '2026-06-23 19:00:00', 15.00, 1),  -- La La Land sala 3 cine 1 (2D)
-    (4, 4, '2026-06-22 21:00:00', 22.00, 2),  -- It sala 1 cine 2 (3D)
-    (5, 5, '2026-06-23 11:00:00', 16.00, 1);  -- Rey León sala 2 cine 2 (2D)
+    (1, 1, '2026-06-29 14:00:00', 18.00, 1),  -- Avengers sala 1 cine 1 (2D) - hoy
+    (1, 2, '2026-06-29 17:30:00', 22.00, 2),  -- Avengers sala 2 cine 1 (3D) - hoy
+    (2, 1, '2026-06-30 20:00:00', 20.00, 1),  -- Inception sala 1 cine 1 (2D) - mañana
+    (3, 3, '2026-06-30 19:00:00', 15.00, 1),  -- La La Land sala 3 cine 1 (2D) - mañana
+    (4, 4, '2026-07-01 21:00:00', 22.00, 2),  -- It sala 1 cine 2 (3D) - 1 julio
+    (5, 5, '2026-07-02 11:00:00', 16.00, 1);  -- Rey León sala 2 cine 2 (2D) - 2 julio
 
 -- ASIENTOS
 -- id_estado_asiento: 1=DISPONIBLE, 2=OCUPADO, 3=RESERVADO

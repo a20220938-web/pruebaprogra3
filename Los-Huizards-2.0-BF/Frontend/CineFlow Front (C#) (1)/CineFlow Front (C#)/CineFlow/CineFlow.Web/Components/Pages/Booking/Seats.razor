@@ -5,6 +5,7 @@
 @inject NavigationManager NavigationManager
 @inject IFuncionesServiceClient FuncionesService
 @inject BookingState BookingState
+@inject IReservasServiceClient ReservasService
 @inject CineFlow.Web.Servicios.User.UserState UserState
 
 <PageTitle>Selección de Asientos - CineFlow</PageTitle>
@@ -25,7 +26,10 @@
     }
     else
     {
-        <h2 class="fw-bold mb-4">Selecciona tus Asientos</h2>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2 class="fw-bold mb-0">Selecciona tus Asientos</h2>
+            <CancelReservation MovieId="@MovieId" />
+        </div>
         <div class="row">
             <div class="col-md-8">
                 <div class="bg-body p-4 rounded shadow">
@@ -70,7 +74,7 @@
                         <h6>Asientos Seleccionados:</h6>
                         @if (!BookingState.SelectedSeats.Any())
                         {
-                            <p class="text-muted small">Ningún asiento seleccionado.</p>
+                            <p class="text-body-secondary small">Ningún asiento seleccionado.</p>
                         }
                         else
                         {
@@ -86,9 +90,17 @@
                     </div>
                 </div>
 
-                <button class="btn btn-danger w-100 fw-bold py-2" disabled="@(!BookingState.SelectedSeats.Any())" @onclick="GoToTicketType">
+                <button class="btn btn-danger w-100 fw-bold py-2" disabled="@(!BookingState.SelectedSeats.Any() || isSaving)" @onclick="GoToTicketType">
+                    @if (isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
                     Continuar a Tipos de Entrada
                 </button>
+                @if (!string.IsNullOrEmpty(seatError))
+                {
+                    <div class="alert alert-danger mt-2 p-2 small">@seatError</div>
+                }
             </div>
         </div>
     }
@@ -104,6 +116,8 @@
     private FuncionViewModel Funcion;
     private List<AsientoViewModel> Asientos = new();
     private bool isLoading = true;
+    private bool isSaving = false;
+    private string seatError = string.Empty;
 
     protected override async Task OnInitializedAsync()
     {
@@ -112,6 +126,24 @@
             NavigationManager.NavigateTo($"/login?returnUrl=/movies/{MovieId}/seats/{FuncionId}", forceLoad: false);
             return;
         }
+
+        // Usuario retrocedió desde Payment (reserva ya creada) → cancelarla
+        if (BookingState.IdReserva > 0)
+        {
+            try { await ReservasService.CancelarReservaAsync(BookingState.IdReserva); } catch { }
+            BookingState.IdReserva = 0;
+        }
+        // Usuario retrocedió desde TicketType/Snacks (solo pre-reserva) → liberar asientos
+        else if (BookingState.PreReservedSeats.Any())
+        {
+            try { await ReservasService.LiberarAsientosAsync(BookingState.PreReservedSeats); } catch { }
+        }
+
+        BookingState.PreReservedSeats.Clear();
+        BookingState.SelectedSeats.Clear();
+        BookingState.TicketTypes.Clear();
+        BookingState.SelectedSnacks.Clear();
+
         try
         {
             if (int.TryParse(FuncionId, out int id))
@@ -133,6 +165,7 @@
 
     private string GetSeatClass(AsientoViewModel asiento)
     {
+        if (asiento.Estado == "RESERVADO") return "btn-secondary";
         if (asiento.Estado != "DISPONIBLE") return "btn-secondary";
         if (BookingState.SelectedSeats.Contains(asiento.IdAsiento)) return "btn-danger text-white";
         return "btn-outline-secondary";
@@ -152,17 +185,32 @@
         }
     }
 
-    private void GoToTicketType()
+    private async Task GoToTicketType()
     {
-        // Inicializar tipos de entrada para los nuevos asientos seleccionados
+        isSaving = true;
+        seatError = string.Empty;
+
+        var ok = await ReservasService.PreReservarAsientosAsync(BookingState.SelectedSeats);
+        if (!ok)
+        {
+            seatError = "Uno o más asientos ya fueron reservados por otra persona. Selecciona otros.";
+            // Refrescar el mapa para mostrar los asientos actualizados
+            if (int.TryParse(FuncionId, out int id))
+                Asientos = await FuncionesService.ListarAsientosAsync(id);
+            BookingState.SelectedSeats.Clear();
+            isSaving = false;
+            return;
+        }
+
+        BookingState.PreReservedSeats = new List<int>(BookingState.SelectedSeats);
+
+        // Inicializar tipos de entrada para los asientos seleccionados
         foreach (var seat in BookingState.SelectedSeats)
         {
             if (!BookingState.TicketTypes.ContainsKey(seat))
-            {
                 BookingState.TicketTypes[seat] = "REGULAR";
-            }
         }
-        
+
         NavigationManager.NavigateTo($"/movies/{MovieId}/seats/{FuncionId}/ticket-type");
     }
 }

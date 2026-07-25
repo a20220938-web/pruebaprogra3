@@ -10,6 +10,7 @@ import pe.edu.pucp.cineflow.modelo.reserva.EstadoAsiento;
 
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 
 @Path("/v1/asientos")
 @Produces(MediaType.APPLICATION_JSON)
@@ -74,5 +75,41 @@ public class AsientosResource {
         }
 
         return Response.ok(Map.of("mensaje", "Estado del asiento actualizado a " + nuevoEstado)).build();
+    }
+
+    // Marca una lista de asientos como RESERVADO (llamado al avanzar desde selección de asientos)
+    @POST
+    @Path("pre-reservar")
+    public Response preReservar(List<Integer> idsAsientos) {
+        if (idsAsientos == null || idsAsientos.isEmpty()) {
+            return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(Map.of("error", "La lista de asientos no puede estar vacía"))
+                    .build();
+        }
+        try {
+            asientoBo.preReservarLote(idsAsientos);
+        } catch (IllegalStateException e) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(Map.of("error", e.getMessage()))
+                    .build();
+        }
+        return Response.ok(Map.of("mensaje", "Asientos pre-reservados correctamente")).build();
+    }
+
+    // Libera una lista de asientos de RESERVADO a DISPONIBLE (cancelación sin reserva creada)
+    @POST
+    @Path("liberar")
+    public Response liberar(List<Integer> idsAsientos) {
+        if (idsAsientos == null || idsAsientos.isEmpty()) {
+            return Response.ok(Map.of("mensaje", "Sin asientos que liberar")).build();
+        }
+        try {
+            asientoBo.liberarLote(idsAsientos);
+        } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of("error", e.getMessage()))
+                    .build();
+        }
+        return Response.ok(Map.of("mensaje", "Asientos liberados correctamente")).build();
     }
 }

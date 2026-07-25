@@ -1,6 +1,7 @@
 package pe.edu.pucp.cineflow.bo.reserva;
 
 import pe.edu.pucp.cineflow.bo.BaseBo;
+import pe.edu.pucp.cineflow.dao.TransactionsManager;
 import pe.edu.pucp.cineflow.dao.reserva.AsientoDaoImpl;
 import pe.edu.pucp.cineflow.dao.reserva.IAsientoDao;
 import pe.edu.pucp.cineflow.modelo.Estado;
@@ -82,5 +83,53 @@ public class AsientoBoImpl extends BaseBo implements IAsientoBo {
         validarIdPositivo(id, "id de asiento");
         if (!asientoDao.eliminar(id))
             throw new IllegalStateException("No se pudo eliminar el asiento con id: " + id);
+    }
+
+    // Marca una lista de asientos DISPONIBLE → RESERVADO en una sola transacción
+    @Override
+    public void preReservarLote(List<Integer> idsAsientos) {
+        if (idsAsientos == null || idsAsientos.isEmpty())
+            throw new IllegalArgumentException("La lista de asientos no puede estar vacía");
+
+        TransactionsManager.iniciarTransaccion();
+        try {
+            for (int id : idsAsientos) {
+                Asiento asiento = asientoDao.leer(id);
+                if (asiento == null)
+                    throw new IllegalStateException("No existe el asiento con id: " + id);
+                if (asiento.getEstado() != EstadoAsiento.DISPONIBLE)
+                    throw new IllegalStateException("El asiento " + id + " no está disponible (estado: " + asiento.getEstado() + ")");
+                asiento.setEstado(EstadoAsiento.RESERVADO);
+                if (!asientoDao.actualizar(asiento))
+                    throw new IllegalStateException("No se pudo reservar el asiento id: " + id);
+            }
+            TransactionsManager.commitTransaccion();
+        } catch (Exception e) {
+            TransactionsManager.rollbackTransaccion();
+            throw e;
+        }
+    }
+
+    // Libera una lista de asientos RESERVADO → DISPONIBLE (asientos OCUPADO se ignoran)
+    @Override
+    public void liberarLote(List<Integer> idsAsientos) {
+        if (idsAsientos == null || idsAsientos.isEmpty()) return;
+
+        TransactionsManager.iniciarTransaccion();
+        try {
+            for (int id : idsAsientos) {
+                Asiento asiento = asientoDao.leer(id);
+                if (asiento == null) continue;
+                if (asiento.getEstado() == EstadoAsiento.RESERVADO) {
+                    asiento.setEstado(EstadoAsiento.DISPONIBLE);
+                    asientoDao.actualizar(asiento);
+                }
+                // Si ya está DISPONIBLE u OCUPADO no se toca
+            }
+            TransactionsManager.commitTransaccion();
+        } catch (Exception e) {
+            TransactionsManager.rollbackTransaccion();
+            throw e;
+        }
     }
 }

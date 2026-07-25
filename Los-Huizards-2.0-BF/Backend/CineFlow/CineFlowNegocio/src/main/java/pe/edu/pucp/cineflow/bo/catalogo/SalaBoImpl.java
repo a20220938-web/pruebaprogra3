@@ -25,6 +25,12 @@ public class SalaBoImpl extends BaseBo implements ISalaBo {
     }
 
     @Override
+    public List<Sala> listarPorCine(int idCine) {
+        validarIdPositivo(idCine, "idCine");
+        return salaDao.listarPorCine(idCine);
+    }
+
+    @Override
     public void eliminar(int id) {
         validarIdPositivo(id, "id");
         if (!salaDao.eliminar(id))

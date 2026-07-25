@@ -23,6 +23,21 @@ public class InventarioCineDaoImpl extends DefaultBaseDao<InventarioCine>
     }
 
     @Override
+    public void recalcularStock() {
+        ejecutarComando(conn -> {
+            try (PreparedStatement cmd = conn.prepareStatement(
+                    "UPDATE inventario_cine ic SET ic.stock_actual = " +
+                    "(SELECT COALESCE(SUM(c.cantidad),0) FROM CONFITERIA c " +
+                    " WHERE c.id_inventario = ic.id_inventario);")) {
+                cmd.executeUpdate();
+                return null;
+            } catch (SQLException e) {
+                throw new RuntimeException(e);
+            }
+        });
+    }
+
+    @Override
     protected PreparedStatement comandoCrear(Connection conn, InventarioCine modelo) throws SQLException {
         PreparedStatement cmd = conn.prepareStatement(
                 "INSERT INTO inventario_cine (stock_actual, stock_minimo, ultima_reposicion, id_cine) " +

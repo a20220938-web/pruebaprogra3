@@ -124,11 +124,9 @@ public class PagoBoImpl extends BaseBo implements IPagoBo {
         if (pago.getEstado() != EstadoPago.APROBADO)
             throw new IllegalStateException("El pago no está aprobado; estado actual: " + pago.getEstado());
 
-        // Buscar la reserva asociada al pago
-        Reserva reserva = reservaDao.leerTodos().stream()
-                .filter(r -> r.getPago() != null && r.getPago().getIdPago() == idPago)
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("No se encontró reserva asociada al pago: " + idPago));
+        Reserva reserva = reservaDao.leerPorPago(idPago);
+        if (reserva == null)
+            throw new IllegalStateException("No se encontró reserva asociada al pago: " + idPago);
 
         TransactionsManager.iniciarTransaccion();
         try {
@@ -145,18 +143,8 @@ public class PagoBoImpl extends BaseBo implements IPagoBo {
                 }
             }
 
-            // 3. Descontar stock de confitería (RF14)
-            Confiteria confiteria = reserva.getConfiteria();
-            if (confiteria != null && confiteria.getCantidad() > 0 && reserva.getInventario() != null) {
-                InventarioCine inventario = inventarioDao.leer(reserva.getInventario().getIdInventario());
-                if (inventario != null) {
-                    int nuevoStock = inventario.getStockActual() - confiteria.getCantidad();
-                    if (nuevoStock < 0)
-                        throw new IllegalStateException("Stock insuficiente para completar la transacción");
-                    inventario.setStockActual(nuevoStock);
-                    inventarioDao.actualizar(inventario);
-                }
-            }
+            // 3. Descontar stock de confitería por producto (RF14) y recalcular inventario
+            reservaDao.descontarStockConfiteriaPorReserva(reserva.getIdReserva());
 
             // 4. Generar comprobante con código QR (RF14/RF16)
             ComprobanteCompra comprobante = comprobanteDao.leerPorReserva(reserva.getIdReserva());
@@ -188,11 +176,7 @@ public class PagoBoImpl extends BaseBo implements IPagoBo {
         if (pago.getEstado() != EstadoPago.FALLIDO)
             throw new IllegalStateException("Solo se puede revertir un pago en estado FALLIDO");
 
-        Reserva reserva = reservaDao.leerTodos().stream()
-                .filter(r -> r.getPago() != null && r.getPago().getIdPago() == idPago)
-                .findFirst()
-                .orElse(null);
-
+        Reserva reserva = reservaDao.leerPorPago(idPago);
         if (reserva == null) return;
 
         TransactionsManager.iniciarTransaccion();

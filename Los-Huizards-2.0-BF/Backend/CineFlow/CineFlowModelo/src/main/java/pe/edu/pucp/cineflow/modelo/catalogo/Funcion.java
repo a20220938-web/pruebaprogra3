@@ -47,16 +47,22 @@ public class Funcion {
         if (sala == null) return;
         mapaAsientos.clear();
 
-        int filas       = sala.getFilas() > 0 ? sala.getFilas() : 1;
-        int colsPorFila = sala.getColumnasPorFila() > 0
-                ? sala.getColumnasPorFila()
-                : sala.getCapacidad();
+        int filas = sala.getFilas();
+        int colsPorFila = sala.getColumnasPorFila();
+        
+        if (filas <= 0 || colsPorFila <= 0) {
+            colsPorFila = Math.min(sala.getCapacidad(), 10);
+            if (colsPorFila == 0) colsPorFila = 1;
+            filas = (int) Math.ceil((double) sala.getCapacidad() / colsPorFila);
+        }
 
         int asientoId = 1;
         for (int f = 0; f < filas && asientoId <= sala.getCapacidad(); f++) {
             char letraFila = (char) ('A' + f);
             for (int c = 1; c <= colsPorFila && asientoId <= sala.getCapacidad(); c++) {
-                mapaAsientos.add(new Asiento(asientoId, letraFila, c, false, EstadoAsiento.DISPONIBLE, this));
+                // Las 2 primeras butacas de la fila del frente son para discapacitados
+                boolean esConadis = (f == 0 && c <= 2);
+                mapaAsientos.add(new Asiento(asientoId, letraFila, c, esConadis, EstadoAsiento.DISPONIBLE, this));
                 asientoId++;
             }
         }
