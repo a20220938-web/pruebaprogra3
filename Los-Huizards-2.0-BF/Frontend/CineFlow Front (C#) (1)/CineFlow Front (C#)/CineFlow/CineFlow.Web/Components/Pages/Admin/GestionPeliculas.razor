@@ -1,0 +1,554 @@
+@page "/admin/peliculas"
+@using CineFlow.Web.Servicios.Catalogo
+@using CineFlow.Web.ViewModels.Catalogo
+@inject CineFlow.Web.Servicios.User.UserState UserState
+@inject NavigationManager NavigationManager
+@inject IPeliculasServiceClient PeliculasService
+@inject IFuncionesServiceClient FuncionesService
+@inject ICinesServiceClient CinesService
+
+<PageTitle>Gestión de Películas - Admin</PageTitle>
+
+@if (!UserState.IsAdmin)
+{
+    <div class="alert alert-danger m-5">Acceso denegado. No tienes permisos para ver esta página.</div>
+}
+else
+{
+    <div class="min-h-screen bg-background">
+      <div class="max-w-7xl mx-auto px-4 py-8">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 class="text-2xl text-foreground mb-2" style="font-size: 1.5rem; font-weight:bold;">Gestión de Películas</h1>
+            <p class="text-muted-foreground">Administra el catálogo de películas y sus detalles</p>
+          </div>
+          <button class="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors" @onclick="() => AbrirModal()">
+            <i class="bi bi-plus-lg"></i>
+            Nueva Película
+          </button>
+        </div>
+
+        <div class="bg-card rounded-lg shadow-sm border border-border p-6 mb-8">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="text-body fw-semibold small mb-1"><i class="bi bi-search text-primary me-1"></i>Buscar</label>
+              <input type="text" placeholder="Buscar película..." class="form-control bg-body-tertiary text-body border-secondary" @bind="searchTerm" @bind:event="oninput" />
+            </div>
+            <div class="col-md-2">
+              <label class="text-body fw-semibold small mb-1"><i class="bi bi-film text-primary me-1"></i>Género</label>
+              <select class="form-select bg-body-tertiary text-body border-secondary" @bind="generoFiltro">
+                <option value="Todos">Todos</option>
+                <option value="TERROR">Terror</option>
+                <option value="ACCION">Acción</option>
+                <option value="CIENCIA_FICCION">Ciencia Ficción</option>
+                <option value="COMEDIA">Comedia</option>
+                <option value="ANIMACION">Animación</option>
+                <option value="DRAMA">Drama</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="text-body fw-semibold small mb-1"><i class="bi bi-person-badge text-primary me-1"></i>Clasificación</label>
+              <select class="form-select bg-body-tertiary text-body border-secondary" @bind="censuraFiltro">
+                <option value="Todas">Cualquiera</option>
+                <option value="ATP">ATP</option>
+                <option value="+13">+13</option>
+                <option value="+14">+14</option>
+                <option value="+16">+16</option>
+                <option value="+18">+18</option>
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="text-body fw-semibold small mb-1"><i class="bi bi-sort-down text-primary me-1"></i>Ordenar</label>
+              <select class="form-select bg-body-tertiary text-body border-secondary" @bind="sortFiltro">
+                <option value="A-Z">A - Z</option>
+                <option value="Z-A">Z - A</option>
+                <option value="Cortas">Más Cortas</option>
+                <option value="Largas">Más Largas</option>
+              </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button class="btn btn-outline-danger w-100" @onclick="LimpiarFiltros">
+                <i class="bi bi-x-circle me-1"></i> Quitar Filtros
+              </button>
+            </div>
+          </div>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-danger" role="status"></div>
+                <p class="mt-3">Cargando películas...</p>
+            </div>
+        }
+        else
+        {
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                @foreach (var p in PeliculasFiltradas)
+                {
+                    <div class="bg-card rounded-lg shadow-md border border-border overflow-hidden flex flex-col">
+                      <div class="aspect-video bg-muted relative">
+                        <img src="@(p.PosterUrl ?? "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400")" alt="Poster" class="w-full h-full object-cover" />
+                        <div class="absolute top-2 right-2 flex gap-2">
+                          <span class="px-2 py-1 bg-black/60 backdrop-blur-md text-white text-xs rounded">@p.EdadRestriccion</span>
+                          <span class="px-2 py-1 bg-primary/80 backdrop-blur-md text-white text-xs rounded">@p.Genero</span>
+                        </div>
+                      </div>
+                      <div class="p-4 flex-1">
+                        <h3 class="text-lg font-semibold text-foreground mb-1 line-clamp-1">@p.Titulo</h3>
+                        <div class="flex items-center gap-2 text-sm text-muted-foreground mb-3">
+                          <i class="bi bi-clock"></i>
+                          <span>@p.Duracion min</span>
+                        </div>
+                        <p class="text-sm text-muted-foreground line-clamp-2 mb-4">@p.Sinopsis</p>
+                        <div class="flex items-center justify-end gap-2 mt-auto pt-4 border-t border-border">
+                          <button class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-foreground dark:text-white hover:bg-muted dark:hover:bg-gray-700 rounded-md transition-colors" @onclick="() => AbrirModal(p)">
+                            <i class="bi bi-pencil"></i> Editar
+                          </button>
+                          <button class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-primary hover:bg-primary/10 rounded-md transition-colors text-primary" @onclick="() => AbrirModalFunciones(p)">
+                            <i class="bi bi-calendar-event"></i> Funciones
+                          </button>
+                          <button class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-destructive hover:bg-destructive/10 rounded-md transition-colors text-danger" @onclick="() => Eliminar(p)">
+                            <i class="bi bi-trash"></i> Eliminar
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                }
+            </div>
+        }
+      </div>
+    </div>
+
+    @if (modalAbierto)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-dialog-centered text-body">
+                <div class="modal-content bg-card">
+                    <div class="modal-header border-border">
+                        <h5 class="modal-title fw-bold text-foreground">@(editando ? "Editar Película" : "Nueva Película")</h5>
+                        <button type="button" class="btn-close dark:invert" @onclick="CerrarModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label text-body">Título</label>
+                            <input type="text" class="form-control bg-body-tertiary text-body border-secondary" @bind="tempPeli.Titulo" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-body">Género</label>
+                            <select class="form-select bg-body-tertiary text-body border-secondary" @bind="tempPeli.Genero">
+                                <option value="TERROR">Terror</option>
+                                <option value="ACCION">Acción</option>
+                                <option value="CIENCIA_FICCION">Ciencia Ficción</option>
+                                <option value="COMEDIA">Comedia</option>
+                                <option value="ANIMACION">Animación</option>
+                                <option value="DRAMA">Drama</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-body">Clasificación</label>
+                            <select class="form-select bg-body-tertiary text-body border-secondary" @bind="tempPeli.EdadRestriccion">
+                                <option value="ATP">ATP</option>
+                                <option value="+13">+13</option>
+                                <option value="+14">+14</option>
+                                <option value="+16">+16</option>
+                                <option value="+18">+18</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-body">Duración (min)</label>
+                            <input type="number" class="form-control bg-body-tertiary text-body border-secondary" @bind="tempPeli.Duracion" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-body">URL del Poster</label>
+                            <input type="text" class="form-control bg-body-tertiary text-body border-secondary" @bind="tempPeli.PosterUrl" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-body">Sinopsis</label>
+                            <textarea class="form-control bg-body-tertiary text-body border-secondary" @bind="tempPeli.Sinopsis"></textarea>
+                        </div>
+                        @if (!string.IsNullOrEmpty(errorMsg))
+                        {
+                            <div class="alert alert-danger">@errorMsg</div>
+                        }
+                    </div>
+                    <div class="modal-footer border-border">
+                        <button type="button" class="btn btn-secondary" @onclick="CerrarModal">Cancelar</button>
+                        <button type="button" class="btn btn-danger" @onclick="Guardar" disabled="@guardando">
+                            @if (guardando) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                            Guardar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (modalFuncionesAbierto && peliculaSeleccionada != null)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-dialog-centered modal-lg text-body">
+                <div class="modal-content bg-card">
+                    <div class="modal-header border-border">
+                        <h5 class="modal-title fw-bold text-foreground">Funciones de: @peliculaSeleccionada.Titulo</h5>
+                        <button type="button" class="btn-close dark:invert" @onclick="CerrarModalFunciones"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if (cargandoFunciones)
+                        {
+                            <div class="text-center"><div class="spinner-border text-primary"></div></div>
+                        }
+                        else
+                        {
+                            <div class="mb-4 border p-3 rounded">
+                                <h6>@(editandoFuncion ? "Editar Función" : "Nueva Función")</h6>
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <label class="form-label small">Fecha y Hora</label>
+                                        <input type="datetime-local" class="form-control form-control-sm" @bind="tempFuncion.FechaHora" />
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small">Precio</label>
+                                        <input type="number" class="form-control form-control-sm" @bind="tempFuncion.PrecioBase" step="0.5" />
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small">Formato</label>
+                                        <select class="form-select form-select-sm" @bind="tempFuncion.Formato">
+                                            <option value="DosD">2D</option>
+                                            <option value="tresD">3D</option>
+                                            <option value="IMAX">IMAX</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small">Cine</label>
+                                        <select class="form-select form-select-sm" @bind="tempCineId" @bind:after="OnCineChanged">
+                                            <option value="0">-- Seleccione --</option>
+                                            @foreach (var c in cinesActuales)
+                                            {
+                                                <option value="@c.Id">@c.Nombre</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <label class="form-label small">Sala</label>
+                                        <select class="form-select form-select-sm" @bind="tempSalaId">
+                                            @foreach (var s in salasDisponibles)
+                                            {
+                                                <option value="@s.Id">Sala @s.Numero</option>
+                                            }
+                                        </select>
+                                    </div>
+                                    <div class="col-12 mt-2 text-end">
+                                        @if (editandoFuncion)
+                                        {
+                                            <button class="btn btn-sm btn-secondary me-2" @onclick="CancelarEdicionFuncion">Cancelar</button>
+                                        }
+                                        <button class="btn btn-sm btn-primary" @onclick="GuardarFuncion" disabled="@guardandoFuncion">
+                                            @(guardandoFuncion ? "Guardando..." : "Guardar Función")
+                                        </button>
+                                        @if (!string.IsNullOrEmpty(errorMsgFuncion))
+                                        {
+                                            <div class="col-12 mt-2">
+                                                <div class="alert alert-danger p-2 mb-0 small">@errorMsgFuncion</div>
+                                            </div>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-sm table-hover align-middle">
+                                    <thead>
+                                        <tr>
+                                            <th>Fecha y Hora</th>
+                                            <th>Sala</th>
+                                            <th>Formato</th>
+                                            <th>Precio</th>
+                                            <th>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach(var f in funcionesActuales.OrderBy(f => f.FechaHora))
+                                        {
+                                            <tr>
+                                                <td>@f.FechaHora.ToString("dd/MM/yyyy HH:mm")</td>
+                                                <td>Sala @(f.Sala?.Id ?? 0)</td>
+                                                <td>@f.Formato</td>
+                                                <td>S/ @f.PrecioBase</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-outline-primary me-1" @onclick="() => EditarFuncion(f)"><i class="bi bi-pencil"></i></button>
+                                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => EliminarFuncion(f.Id)"><i class="bi bi-trash"></i></button>
+                                                </td>
+                                            </tr>
+                                        }
+                                        @if(!funcionesActuales.Any())
+                                        {
+                                            <tr><td colspan="5" class="text-center text-muted">No hay funciones registradas.</td></tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<PeliculaViewModel> peliculas = new();
+    private bool isLoading = true;
+    private bool guardando = false;
+    private string errorMsg = "";
+
+    private string searchTerm = "";
+    private string generoFiltro = "Todos";
+    private string censuraFiltro = "Todas";
+    private string sortFiltro = "A-Z";
+
+    private IEnumerable<PeliculaViewModel> PeliculasFiltradas
+    {
+        get
+        {
+            var filtrado = peliculas.Where(p =>
+                (string.IsNullOrWhiteSpace(searchTerm) || (p.Titulo ?? "").Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) &&
+                (generoFiltro == "Todos" || string.Equals(p.Genero, generoFiltro, StringComparison.OrdinalIgnoreCase)) &&
+                (censuraFiltro == "Todas" || string.Equals(p.EdadRestriccion, censuraFiltro, StringComparison.OrdinalIgnoreCase))
+            );
+
+            return sortFiltro switch
+            {
+                "A-Z" => filtrado.OrderBy(p => p.Titulo),
+                "Z-A" => filtrado.OrderByDescending(p => p.Titulo),
+                "Cortas" => filtrado.OrderBy(p => p.Duracion),
+                "Largas" => filtrado.OrderByDescending(p => p.Duracion),
+                _ => filtrado
+            };
+        }
+    }
+
+    private bool modalAbierto = false;
+    private bool editando = false;
+    private PeliculaViewModel tempPeli = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserState.IsAdmin)
+        {
+            NavigationManager.NavigateTo("/");
+            return;
+        }
+        await CargarPeliculas();
+    }
+
+    private async Task CargarPeliculas()
+    {
+        isLoading = true;
+        peliculas = await PeliculasService.ListarAsync();
+        isLoading = false;
+    }
+
+    private void LimpiarFiltros()
+    {
+        searchTerm = "";
+        generoFiltro = "Todos";
+        censuraFiltro = "Todas";
+        sortFiltro = "A-Z";
+    }
+
+    private void AbrirModal(PeliculaViewModel? p = null)
+    {
+        errorMsg = "";
+        if (p != null)
+        {
+            editando = true;
+            tempPeli = new PeliculaViewModel
+            {
+                Id = p.Id,
+                Titulo = p.Titulo,
+                Sinopsis = p.Sinopsis,
+                Duracion = p.Duracion,
+                Genero = p.Genero,
+                EdadRestriccion = p.EdadRestriccion,
+                PosterUrl = p.PosterUrl
+            };
+        }
+        else
+        {
+            editando = false;
+            tempPeli = new PeliculaViewModel { Genero = "ACCION", EdadRestriccion = "ATP" };
+        }
+        modalAbierto = true;
+    }
+
+    private void CerrarModal() => modalAbierto = false;
+
+    private async Task Guardar()
+    {
+        errorMsg = "";
+        guardando = true;
+        if (editando)
+        {
+            var ok = await PeliculasService.ActualizarAsync(tempPeli.Id, tempPeli);
+            if (ok)
+            {
+                var idx = peliculas.FindIndex(x => x.Id == tempPeli.Id);
+                if (idx >= 0) peliculas[idx] = tempPeli;
+                CerrarModal();
+            }
+            else
+            {
+                errorMsg = "Error al actualizar la película.";
+            }
+        }
+        else
+        {
+            var created = await PeliculasService.CrearAsync(tempPeli);
+            if (created != null)
+            {
+                peliculas.Add(created);
+                CerrarModal();
+            }
+            else
+            {
+                errorMsg = "Error al crear la película.";
+            }
+        }
+        guardando = false;
+    }
+
+    private async Task Eliminar(PeliculaViewModel p)
+    {
+        var ok = await PeliculasService.EliminarAsync(p.Id);
+        if (ok) peliculas.Remove(p);
+    }
+
+    private string errorMsgFuncion = "";
+    private bool modalFuncionesAbierto = false;
+    private bool cargandoFunciones = false;
+    private bool guardandoFuncion = false;
+    private bool editandoFuncion = false;
+    private PeliculaViewModel? peliculaSeleccionada;
+    private List<FuncionViewModel> funcionesActuales = new();
+    private FuncionViewModel tempFuncion = new();
+    private int tempSalaId = 1;
+    private int tempCineId = 0;
+    private List<CineViewModel> cinesActuales = new();
+    private List<SalaViewModel> salasDisponibles = new();
+
+    private async Task AbrirModalFunciones(PeliculaViewModel p)
+    {
+        peliculaSeleccionada = p;
+        modalFuncionesAbierto = true;
+        cargandoFunciones = true;
+        if (!cinesActuales.Any())
+        {
+            cinesActuales = await CinesService.ListarAsync();
+        }
+        funcionesActuales = await FuncionesService.ListarPorPeliculaAsync(p.Id) ?? new();
+        cargandoFunciones = false;
+        await CancelarEdicionFuncion();
+    }
+
+    private void CerrarModalFunciones()
+    {
+        modalFuncionesAbierto = false;
+        peliculaSeleccionada = null;
+    }
+
+    private async Task CancelarEdicionFuncion()
+    {
+        editandoFuncion = false;
+        tempFuncion = new FuncionViewModel { FechaHora = DateTime.Now.AddDays(1), Formato = "DosD", PrecioBase = 15.0 };
+        tempCineId = cinesActuales.FirstOrDefault()?.Id ?? 0;
+        await OnCineChanged();
+    }
+
+    private async Task OnCineChanged()
+    {
+        salasDisponibles.Clear();
+        if (tempCineId > 0)
+        {
+            salasDisponibles = await CinesService.ListarSalasPorCineAsync(tempCineId) ?? new();
+        }
+        
+        if (salasDisponibles.Any())
+        {
+            tempSalaId = salasDisponibles.First().Id;
+        }
+    }
+
+    private async Task EditarFuncion(FuncionViewModel f)
+    {
+        editandoFuncion = true;
+        tempFuncion = new FuncionViewModel
+        {
+            Id = f.Id,
+            FechaHora = f.FechaHora,
+            PrecioBase = f.PrecioBase,
+            Formato = f.Formato
+        };
+        tempSalaId = f.Sala?.Id ?? 1;
+        tempCineId = f.Sala?.Cine?.Id ?? ((tempSalaId - 1) / 3) + 1; // Fallback
+        await OnCineChanged();
+        tempSalaId = f.Sala?.Id ?? 1;
+    }
+
+    private async Task GuardarFuncion()
+    {
+        if (peliculaSeleccionada == null) return;
+        guardandoFuncion = true;
+        errorMsgFuncion = "";
+
+        tempFuncion.Pelicula = new PeliculaViewModel { Id = peliculaSeleccionada.Id };
+        tempFuncion.Sala = new SalaViewModel { Id = tempSalaId };
+
+        try
+        {
+            if (editandoFuncion)
+            {
+                var ok = await FuncionesService.ActualizarAsync(tempFuncion.Id, tempFuncion);
+                if (ok)
+                {
+                    var idx = funcionesActuales.FindIndex(x => x.Id == tempFuncion.Id);
+                    if (idx >= 0)
+                    {
+                        // Update local copy
+                        tempFuncion.Sala = new SalaViewModel { Id = tempSalaId };
+                        funcionesActuales[idx] = tempFuncion;
+                    }
+                    await CancelarEdicionFuncion();
+                }
+            }
+            else
+            {
+                var created = await FuncionesService.CrearAsync(tempFuncion);
+                if (created != null)
+                {
+                    // Assign sala manually for UI if backend doesn't populate fully
+                    if (created.Sala == null) created.Sala = new SalaViewModel { Id = tempSalaId };
+                    funcionesActuales.Add(created);
+                    await CancelarEdicionFuncion();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            errorMsgFuncion = ex.Message;
+        }
+        finally
+        {
+            guardandoFuncion = false;
+        }
+    }
+
+    private async Task EliminarFuncion(int id)
+    {
+        var ok = await FuncionesService.EliminarAsync(id);
+        if (ok)
+        {
+            funcionesActuales.RemoveAll(x => x.Id == id);
+        }
+    }
+}

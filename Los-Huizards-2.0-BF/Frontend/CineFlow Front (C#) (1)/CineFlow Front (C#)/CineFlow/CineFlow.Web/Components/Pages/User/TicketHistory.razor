@@ -1,0 +1,139 @@
+@page "/User/Tickets"
+@page "/tickets"
+@page "/mis-reservas"
+@using CineFlow.Web.Servicios.Reserva
+@using CineFlow.Web.ViewModels.Reserva
+@inject IReservasServiceClient ReservasService
+@inject CineFlow.Web.Servicios.User.UserState UserState
+@inject CineFlow.Web.Servicios.Reserva.ReservasCacheService ReservasCache
+@inject NavigationManager NavigationManager
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+
+<PageTitle>Mis Entradas - CineFlow</PageTitle>
+
+<div class="container py-5 mt-4">
+    <div class="text-center mb-5">
+        <h1 class="fw-bold text-body">Mis Entradas</h1>
+        <p class="text-body-secondary">Historial de tus próximas funciones y películas vistas</p>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            @if (isLoading)
+            {
+                <div class="text-center py-5">
+                    <div class="spinner-border text-danger" role="status">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                </div>
+            }
+            else if (reservas.Count == 0)
+            {
+                <p class="text-center text-body-secondary">No tienes reservas registradas.</p>
+            }
+            else
+            {
+                @foreach (var reserva in reservas.OrderByDescending(r => r.FechaReserva))
+                {
+                    var isPast       = reserva.Funcion?.FechaHora < DateTime.Now;
+                    var peliculaTitulo = reserva.Funcion?.Pelicula?.Titulo ?? "Película Desconocida";
+                    var fechaString    = reserva.Funcion?.FechaHora.ToString("dd MMMM, yyyy") ?? "Fecha no disponible";
+                    var horaString     = reserva.Funcion?.FechaHora.ToString("HH:mm") ?? "";
+                    var cineNombre     = reserva.Funcion?.Sala?.Cine?.Nombre ?? "CineFlow";
+                    var salaStr        = reserva.Funcion?.Sala?.Numero.ToString() ?? "N/A";
+                    var asientosStr    = string.Join(", ", reserva.Asientos?.Select(a => $"{a.Fila}{a.Numero}") ?? Array.Empty<string>());
+                    
+                    var realTotal = (reserva.Entradas?.Sum(e => e.PrecioBase) ?? 0) + (reserva.Confiterias?.Sum(c => c.PrecioUnitario * c.Cantidad) ?? 0);
+                    if (realTotal == 0) realTotal = reserva.TotalFinal;
+
+                    <div class="card bg-body-tertiary @(reserva.Estado == "CANCELADA" ? "border-secondary border-opacity-25 opacity-60" : isPast ? "border-secondary border-opacity-50 opacity-75" : "border-danger border-2 shadow-lg") rounded-4 mb-4 overflow-hidden">
+                        <div class="row g-0">
+                            <div class="col-md-3 @(reserva.Estado == "CANCELADA" ? "bg-secondary bg-opacity-10 text-secondary" : isPast ? "bg-secondary bg-opacity-25 text-secondary" : "bg-danger text-white") d-flex align-items-center justify-content-center" style="min-height: 150px;">
+                                <i class="bi bi-ticket-perforated display-1 opacity-50"></i>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="card-body p-4">
+                                    <span class="badge @(reserva.Estado == "CANCELADA" ? "bg-secondary" : isPast ? "bg-secondary" : "bg-danger") rounded-pill mb-2">
+                                        @(reserva.Estado == "CANCELADA" ? "Cancelada" : isPast ? "Vista" : "Próximamente")
+                                    </span>
+                                    <h4 class="card-title fw-bold">@peliculaTitulo</h4>
+                                    <p class="card-text mb-1"><i class="bi bi-calendar3 me-2 text-body-secondary"></i> @fechaString</p>
+                                    @if (!isPast)
+                                    {
+                                        <p class="card-text mb-1"><i class="bi bi-clock me-2 text-body-secondary"></i> @horaString hrs</p>
+                                    }
+                                    <p class="card-text mb-0"><i class="bi bi-geo-alt me-2 text-body-secondary"></i> @cineNombre - Sala @salaStr - Asientos @asientosStr</p>
+                                </div>
+                            </div>
+                            <div class="col-md-3 d-flex flex-column align-items-center justify-content-center p-4 border-start border-secondary border-opacity-25 gap-2">
+                                @if (reserva.Estado == "CANCELADA")
+                                {
+                                    <span class="text-body-secondary small text-center">Reserva cancelada</span>
+                                }
+                                else if (!isPast)
+                                {
+                                    <div class="bg-white p-2 rounded mb-1">
+                                        <i class="bi bi-qr-code text-dark" style="font-size: 3rem;"></i>
+                                    </div>
+                                    <a href="@($"{ReportesBase}comprobante?id={reserva.IdReserva}")" target="_blank"
+                                       class="btn btn-sm btn-outline-primary fw-bold rounded-pill w-100">Descargar comprobante (PDF)</a>
+                                }
+                                else
+                                {
+                                    <a href="@($"{ReportesBase}comprobante?id={reserva.IdReserva}")" target="_blank"
+                                       class="btn btn-sm btn-outline-primary fw-bold rounded-pill w-100">Descargar comprobante (PDF)</a>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    // Base del modulo de reportes (PDF). Configurable por appsettings: "ReportesUrl".
+    private string ReportesBase => Configuration["ReportesUrl"] ?? "http://localhost:8080/CineFlowReportes/reportes/";
+
+    private List<ReservaViewModel> reservas = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserState.IsLoggedIn)
+        {
+            NavigationManager.NavigateTo("/login?returnUrl=/mis-reservas", forceLoad: false);
+            return;
+        }
+
+        if (ReservasCache.HasCachedData)
+        {
+            reservas = ReservasCache.GetCached()!;
+            isLoading = false;
+            StateHasChanged();
+        }
+
+        _ = CargarReservasAsync();
+    }
+
+    private async Task CargarReservasAsync()
+    {
+        try
+        {
+            var data = await ReservasService.ListarPorUsuarioAsync(UserState.UserId!.Value);
+            reservas = data;
+            ReservasCache.Set(data);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[TicketHistory] Error: {ex}");
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+}

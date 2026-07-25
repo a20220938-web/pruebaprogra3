@@ -1,0 +1,292 @@
+@page "/admin/confiteria"
+@using CineFlow.Web.Servicios.Reserva
+@using CineFlow.Web.Servicios.Catalogo
+@using CineFlow.Web.ViewModels.Reserva
+@using CineFlow.Web.ViewModels.Catalogo
+@inject CineFlow.Web.Servicios.User.UserState UserState
+@inject NavigationManager NavigationManager
+@inject IConfiteriaServiceClient ConfiteriaService
+@inject ICinesServiceClient CinesService
+@inject IInventarioServiceClient InventarioService
+
+<PageTitle>Gestión de Confitería - Admin</PageTitle>
+
+@if (!UserState.IsAdmin)
+{
+    <div class="alert alert-danger m-5">Acceso denegado. No tienes permisos para ver esta página.</div>
+}
+else
+{
+    <div class="min-h-screen bg-background">
+      <div class="max-w-7xl mx-auto px-4 py-8">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div>
+            <h1 class="text-2xl text-foreground mb-2" style="font-size: 1.5rem; font-weight:bold;">Gestión de Confitería</h1>
+            <p class="text-muted-foreground">Administra los productos disponibles en la confitería</p>
+          </div>
+          <button class="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors" @onclick="() => AbrirModal()">
+            <i class="bi bi-plus-lg"></i>
+            Nuevo Artículo
+          </button>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 mb-3">
+          <label class="fw-semibold mb-0"><i class="bi bi-geo-alt text-primary me-1"></i>Sede:</label>
+          <select class="form-select w-auto" @bind="sedeSeleccionada" @bind:after="CargarArticulos">
+            @foreach (var c in cines)
+            {
+              <option value="@c.Id">@c.Nombre</option>
+            }
+          </select>
+          <span class="text-body-secondary small">Mostrando productos de la sede seleccionada.</span>
+        </div>
+
+        <div class="bg-card rounded-lg shadow-sm border border-border p-6 mb-8">
+          <div class="row g-3">
+            <div class="col-md-5">
+              <label class="text-body fw-semibold small mb-1"><i class="bi bi-search text-primary me-1"></i>Buscar</label>
+              <input
+                type="text"
+                placeholder="Buscar artículo..."
+                class="form-control bg-body-tertiary text-body border-secondary"
+                @bind="searchTerm" @bind:event="oninput"
+              />
+            </div>
+            <div class="col-md-5">
+              <label class="text-body fw-semibold small mb-1"><i class="bi bi-funnel text-primary me-1"></i>Categoría</label>
+              <select class="form-select bg-body-tertiary text-body border-secondary" @bind="categoriaFiltro">
+                <option value="Todas">Todas las categorías</option>
+                <option value="Snack">Snacks</option>
+                <option value="Bebida">Bebidas</option>
+                <option value="Combo">Combos</option>
+              </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+              <button class="btn btn-outline-danger w-100" @onclick="LimpiarFiltros">
+                <i class="bi bi-x-circle me-1"></i> Quitar Filtros
+              </button>
+            </div>
+          </div>
+        </div>
+
+        @if (isLoading)
+        {
+            <div class="text-center py-5">
+                <div class="spinner-border text-danger" role="status"></div>
+                <p class="mt-3">Cargando artículos...</p>
+            </div>
+        }
+        else
+        {
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                @foreach (var a in ArticulosFiltrados)
+                {
+                    <div class="bg-card rounded-lg shadow-md border border-border p-6 flex flex-col">
+                      <div class="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 class="text-lg font-semibold text-foreground">@a.Nombre</h3>
+                          <span class="inline-block px-2 py-1 bg-muted text-muted-foreground text-xs rounded mt-1">@a.Categoria</span>
+                        </div>
+                        <span class="text-xl font-bold text-primary">S/ @a.PrecioUnitario.ToString("N2")</span>
+                      </div>
+                      <p class="text-sm text-muted-foreground mb-4 flex-1">@a.Descripcion</p>
+                      <div class="flex items-center justify-between mt-auto pt-4 border-t border-border">
+                        <div class="text-sm">
+                          <span class="text-muted-foreground">Stock: </span>
+                          <span class="@(a.Cantidad < 20 ? "text-danger font-bold" : "text-foreground font-medium")">@a.Cantidad</span>
+                        </div>
+                        <div class="flex gap-2">
+                          <button class="p-2 text-foreground dark:text-white hover:bg-muted dark:hover:bg-gray-700 rounded-md transition-colors" @onclick="() => AbrirModal(a)"><i class="bi bi-pencil"></i></button>
+                          <button class="p-2 text-destructive hover:bg-destructive/10 rounded-md transition-colors text-danger" @onclick="() => Eliminar(a)"><i class="bi bi-trash"></i></button>
+                        </div>
+                      </div>
+                    </div>
+                }
+            </div>
+        }
+      </div>
+    </div>
+
+    @if (modalAbierto)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+            <div class="modal-dialog modal-dialog-centered text-body">
+                <div class="modal-content bg-card">
+                    <div class="modal-header border-border">
+                        <h5 class="modal-title fw-bold text-foreground">@(editando ? "Editar Artículo" : "Nuevo Artículo")</h5>
+                        <button type="button" class="btn-close dark:invert" @onclick="CerrarModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label text-body">Nombre</label>
+                            <input type="text" class="form-control bg-body-tertiary text-body border-secondary" @bind="tempArticulo.Nombre" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-body">Descripción</label>
+                            <input type="text" class="form-control bg-body-tertiary text-body border-secondary" @bind="tempArticulo.Descripcion" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-body">Categoría</label>
+                            <select class="form-select bg-body-tertiary text-body border-secondary" @bind="tempArticulo.Categoria">
+                                <option value="Snack">Snack</option>
+                                <option value="Bebida">Bebida</option>
+                                <option value="Combo">Combo</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-body">Precio (S/)</label>
+                            <input type="number" step="0.01" class="form-control bg-body-tertiary text-body border-secondary" @bind="tempArticulo.PrecioUnitario" />
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label text-body">Stock</label>
+                            <input type="number" class="form-control bg-body-tertiary text-body border-secondary" @bind="tempArticulo.Cantidad" />
+                        </div>
+@if (!string.IsNullOrEmpty(errorMsg))
+                        {
+                            <div class="alert alert-danger">@errorMsg</div>
+                        }
+                    </div>
+                    <div class="modal-footer border-border">
+                        <button type="button" class="btn btn-secondary" @onclick="CerrarModal">Cancelar</button>
+                        <button type="button" class="btn btn-danger" @onclick="Guardar" disabled="@guardando">
+                            @if (guardando) { <span class="spinner-border spinner-border-sm me-1"></span> }
+                            Guardar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<ConfiteriaViewModel> articulos = new();
+    private List<CineViewModel> cines = new();
+    private Dictionary<int, int> cineToInventario = new();
+    private int sedeSeleccionada;
+    private bool isLoading = true;
+    private bool guardando = false;
+    private string errorMsg = "";
+
+    private string searchTerm = "";
+    private string categoriaFiltro = "Todas";
+
+    private IEnumerable<ConfiteriaViewModel> ArticulosFiltrados =>
+        articulos.Where(a =>
+            (string.IsNullOrWhiteSpace(searchTerm) || a.Nombre.Contains(searchTerm, StringComparison.OrdinalIgnoreCase)) &&
+            (categoriaFiltro == "Todas" || a.Categoria == categoriaFiltro)
+        );
+
+    private bool modalAbierto = false;
+    private bool editando = false;
+    private ConfiteriaViewModel tempArticulo = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserState.IsAdmin)
+        {
+            NavigationManager.NavigateTo("/");
+            return;
+        }
+        try
+        {
+            cines = await CinesService.ListarAsync();
+            var invs = await InventarioService.ListarAsync();
+            cineToInventario = invs.ToDictionary(i => i.IdCine, i => i.IdInventario);
+        }
+        catch { cines = new(); cineToInventario = new(); }
+
+        if (cines.Count > 0) sedeSeleccionada = cines[0].Id;
+        await CargarArticulos();
+    }
+
+    private async Task CargarArticulos()
+    {
+        isLoading = true;
+        articulos = sedeSeleccionada > 0
+            ? await ConfiteriaService.ListarPorCineAsync(sedeSeleccionada)
+            : await ConfiteriaService.ListarAsync();
+        isLoading = false;
+    }
+
+    private void LimpiarFiltros()
+    {
+        searchTerm = "";
+        categoriaFiltro = "Todas";
+    }
+
+    private void AbrirModal(ConfiteriaViewModel? a = null)
+    {
+        errorMsg = "";
+        if (a != null)
+        {
+            editando = true;
+            tempArticulo = new ConfiteriaViewModel
+            {
+                IdItem = a.IdItem,
+                Nombre = a.Nombre,
+                Descripcion = a.Descripcion,
+                Categoria = a.Categoria,
+                PrecioUnitario = a.PrecioUnitario,
+                Cantidad = a.Cantidad,
+                IdInventario = a.IdInventario
+            };
+        }
+        else
+        {
+            editando = false;
+            int idInv = cineToInventario.TryGetValue(sedeSeleccionada, out var v) ? v : 0;
+            tempArticulo = new ConfiteriaViewModel { Categoria = "Snack", IdInventario = idInv };
+        }
+        modalAbierto = true;
+    }
+
+    private void CerrarModal() => modalAbierto = false;
+
+    private async Task Guardar()
+    {
+        errorMsg = "";
+        guardando = true;
+        try
+        {
+        if (editando)
+        {
+            var ok = await ConfiteriaService.ActualizarAsync(tempArticulo.IdItem, tempArticulo);
+            if (ok)
+            {
+                var idx = articulos.FindIndex(x => x.IdItem == tempArticulo.IdItem);
+                if (idx >= 0) articulos[idx] = tempArticulo;
+                CerrarModal();
+            }
+            else
+            {
+                errorMsg = "Error al actualizar el artículo.";
+            }
+        }
+        else
+        {
+            var created = await ConfiteriaService.CrearAsync(tempArticulo);
+            if (created != null)
+            {
+                articulos.Add(created);
+                CerrarModal();
+            }
+            else
+            {
+                errorMsg = "Error al crear el artículo.";
+            }
+        }
+        }
+        catch (Exception ex)
+        {
+            errorMsg = ex.Message;
+        }
+        guardando = false;
+    }
+
+    private async Task Eliminar(ConfiteriaViewModel a)
+    {
+        var ok = await ConfiteriaService.EliminarAsync(a.IdItem);
+        if (ok) articulos.Remove(a);
+    }
+}

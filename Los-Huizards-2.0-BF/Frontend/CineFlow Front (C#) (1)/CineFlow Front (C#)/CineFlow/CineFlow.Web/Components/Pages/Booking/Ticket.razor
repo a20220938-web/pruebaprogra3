@@ -1,0 +1,43 @@
+@page "/ticket/{ReservaId}"
+@inject NavigationManager NavigationManager
+@inject CineFlow.Web.Servicios.User.UserState UserState
+
+<PageTitle>Reserva Confirmada - CineFlow</PageTitle>
+
+<div class="container py-5 text-center text-body">
+    <div class="card bg-body-tertiary text-body border-success mx-auto" style="max-width: 600px;">
+        <div class="card-body py-5">
+            <i class="bi bi-check-circle-fill text-success" style="font-size: 5rem;"></i>
+            <h2 class="fw-bold mt-4 mb-3 text-success">¡Pago Exitoso!</h2>
+            <h4 class="fw-bold mb-4">Código de Reserva: <span class="text-danger">@ReservaId</span></h4>
+            <p class="text-body-secondary mb-4">
+                Tu reserva ha sido confirmada. En un momento te enviaremos los detalles al correo registrado en tu cuenta de CineFlow. 
+                Recuerda presentar este código en la confitería y al momento de entrar a tu sala.
+            </p>
+            
+            <hr class="border-secondary opacity-50 mx-auto w-75" />
+            
+            <div class="mt-4">
+                <button class="btn btn-danger px-5 py-2 fw-bold me-2" @onclick="GoHome">
+                    Volver al Inicio
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string ReservaId { get; set; }
+
+    protected override void OnInitialized()
+    {
+        if (!UserState.IsLoggedIn)
+            NavigationManager.NavigateTo("/login", forceLoad: false);
+    }
+
+    private void GoHome()
+    {
+        NavigationManager.NavigateTo("/");
+    }
+}

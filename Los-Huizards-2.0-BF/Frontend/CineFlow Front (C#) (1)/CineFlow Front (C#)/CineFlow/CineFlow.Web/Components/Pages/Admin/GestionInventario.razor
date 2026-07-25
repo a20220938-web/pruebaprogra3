@@ -1,0 +1,205 @@
+@page "/admin/inventario"
+@using CineFlow.Web.ViewModels.Reserva
+@using CineFlow.Web.ViewModels.Catalogo
+@using CineFlow.Web.Servicios.Reserva
+@using CineFlow.Web.Servicios.Catalogo
+@inject CineFlow.Web.Servicios.User.UserState UserState
+@inject NavigationManager NavigationManager
+@inject IInventarioServiceClient InventarioService
+@inject ICinesServiceClient CinesService
+
+<PageTitle>Gestión de Inventario - Admin</PageTitle>
+
+@if (!UserState.IsAdmin)
+{
+    <div class="alert alert-danger m-5">Acceso denegado. No tienes permisos para ver esta página.</div>
+}
+else
+{
+  <div class="container py-4">
+    <div class="mb-4">
+      <h1 class="text-2xl text-foreground mb-2" style="font-size: 1.5rem; font-weight:bold;">Control de Inventario</h1>
+      <p class="text-body-secondary-foreground">Administra el stock físico de la confitería por sede (tabla inventario_cine). Registra reabastecimientos (ingreso) y mermas (egreso).</p>
+    </div>
+
+    @if (isLoading)
+    {
+      <div class="text-center py-5"><div class="spinner-border text-danger"></div></div>
+    }
+    else
+    {
+      <div class="card shadow-sm border-0">
+        <div class="card-header bg-white fw-bold">Inventario por cine</div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Cine</th>
+                <th class="text-end">Stock actual</th>
+                <th class="text-end">Stock mínimo</th>
+                <th>Última reposición</th>
+                <th class="text-center">Estado</th>
+                <th class="text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              @if (!inventarios.Any())
+              {
+                <tr><td colspan="6" class="text-center text-body-secondary py-3">No hay registros de inventario.</td></tr>
+              }
+              @foreach (var inv in inventarios)
+              {
+                bool bajo = inv.StockActual <= inv.StockMinimo;
+                <tr>
+                  <td class="fw-semibold">@NombreCine(inv.IdCine)</td>
+                  <td class="text-end fw-bold @(bajo ? "text-danger" : "text-success")">@inv.StockActual</td>
+                  <td class="text-end text-body-secondary">@inv.StockMinimo</td>
+                  <td class="text-body-secondary">@FormatFecha(inv.UltimaReposicion)</td>
+                  <td class="text-center">
+                    @if (bajo)
+                    {
+                      <span class="badge bg-danger"><i class="bi bi-exclamation-triangle me-1"></i>Bajo stock</span>
+                    }
+                    else
+                    {
+                      <span class="badge bg-success">Normal</span>
+                    }
+                  </td>
+                  <td class="text-center">
+                    <button class="btn btn-sm btn-success" title="Registrar ingreso" @onclick="() => AbrirModal(inv, true)"><i class="bi bi-plus-lg"></i></button>
+                    <button class="btn btn-sm btn-danger" title="Registrar egreso" @onclick="() => AbrirModal(inv, false)"><i class="bi bi-dash-lg"></i></button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      @if (!string.IsNullOrEmpty(mensaje))
+      {
+        <div class="alert @(exito ? "alert-success" : "alert-danger") mt-3">@mensaje</div>
+      }
+    }
+  </div>
+
+  @if (modalAbierto)
+  {
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5);">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header border-border">
+            <h5 class="modal-title fw-bold text-foreground">Actualizar Stock</h5>
+            <button type="button" class="btn-close dark:invert" @onclick="CerrarModal"></button>
+          </div>
+          <div class="modal-body">
+            <p class="small text-body-secondary mb-2">Stock actual: <strong>@itemSeleccionado?.StockActual</strong></p>
+            <label class="form-label">Cantidad a @(esIngreso ? "ingresar" : "retirar")</label>
+            <input type="number" min="1" class="form-control" @bind="cantidad" />
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @onclick="CerrarModal">Cancelar</button>
+            <button type="button" class="btn btn-danger" disabled="@guardando" @onclick="GuardarMovimiento">Confirmar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
+}
+
+@code {
+    private List<InventarioViewModel> inventarios = new();
+    private Dictionary<int, string> cines = new();
+    private bool isLoading = true;
+
+    private bool modalAbierto = false;
+    private bool esIngreso = false;
+    private InventarioViewModel? itemSeleccionado;
+    private int cantidad = 1;
+    private bool guardando = false;
+    private string mensaje = "";
+    private bool exito = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!UserState.IsAdmin)
+        {
+            NavigationManager.NavigateTo("/");
+            return;
+        }
+        await Cargar();
+    }
+
+    private async Task Cargar()
+    {
+        isLoading = true;
+        try
+        {
+            var listaCines = await CinesService.ListarAsync();
+            cines = listaCines.ToDictionary(c => c.Id, c => c.Nombre ?? $"Cine #{c.Id}");
+        }
+        catch { cines = new(); }
+
+        try { inventarios = await InventarioService.ListarAsync(); }
+        catch { inventarios = new(); }
+
+        isLoading = false;
+    }
+
+    private string NombreCine(int idCine) =>
+        cines.TryGetValue(idCine, out var n) ? n : $"Cine #{idCine}";
+
+    private string FormatFecha(string? iso)
+    {
+        if (string.IsNullOrWhiteSpace(iso)) return "—";
+        return DateTime.TryParse(iso, out var dt) ? dt.ToString("dd/MM/yyyy HH:mm") : iso;
+    }
+
+    private void AbrirModal(InventarioViewModel inv, bool ingreso)
+    {
+        itemSeleccionado = inv;
+        esIngreso = ingreso;
+        cantidad = 1;
+        mensaje = "";
+        modalAbierto = true;
+    }
+
+    private void CerrarModal() => modalAbierto = false;
+
+    private async Task GuardarMovimiento()
+    {
+        if (itemSeleccionado == null || cantidad <= 0) return;
+        guardando = true;
+
+        var nuevoStock = esIngreso
+            ? itemSeleccionado.StockActual + cantidad
+            : Math.Max(0, itemSeleccionado.StockActual - cantidad);
+
+        var payload = new InventarioViewModel
+        {
+            IdInventario = itemSeleccionado.IdInventario,
+            StockActual = nuevoStock,
+            StockMinimo = itemSeleccionado.StockMinimo,
+            IdCine = itemSeleccionado.IdCine,
+            // En un ingreso se actualiza la fecha de reposicion; en egreso se conserva
+            UltimaReposicion = esIngreso
+                ? DateTime.Now.ToString("yyyy-MM-ddTHH:mm:ss")
+                : itemSeleccionado.UltimaReposicion
+        };
+
+        try
+        {
+            var ok = await InventarioService.ActualizarAsync(payload.IdInventario, payload);
+            if (ok)
+            {
+                itemSeleccionado.StockActual = nuevoStock;
+                itemSeleccionado.UltimaReposicion = payload.UltimaReposicion;
+                exito = true;
+                mensaje = $"{(esIngreso ? "Ingreso" : "Egreso")} registrado. Nuevo stock: {nuevoStock}.";
+            }
+            else { exito = false; mensaje = "No se pudo actualizar el inventario."; }
+        }
+        catch { exito = false; mensaje = "Error al actualizar el inventario."; }
+        finally { guardando = false; CerrarModal(); }
+    }
+}

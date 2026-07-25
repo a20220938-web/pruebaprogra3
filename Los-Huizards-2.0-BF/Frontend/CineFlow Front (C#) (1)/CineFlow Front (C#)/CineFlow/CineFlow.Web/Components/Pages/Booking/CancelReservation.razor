@@ -1,0 +1,32 @@
+@using CineFlow.Web.Servicios.Reserva
+@inject NavigationManager NavigationManager
+@inject BookingState BookingState
+@inject IReservasServiceClient ReservasService
+
+<button class="btn btn-outline-danger fw-bold" @onclick="HandleCancel" @onclick:preventDefault="true">
+    <i class="bi bi-x-circle me-1"></i>Cancelar reserva
+</button>
+
+@code {
+    [Parameter]
+    public string MovieId { get; set; }
+
+    private async Task HandleCancel()
+    {
+        try
+        {
+            if (BookingState.IdReserva > 0)
+            {
+                await ReservasService.CancelarReservaAsync(BookingState.IdReserva);
+            }
+            else if (BookingState.PreReservedSeats.Any())
+            {
+                await ReservasService.LiberarAsientosAsync(BookingState.PreReservedSeats);
+            }
+        }
+        catch { }
+
+        BookingState.Clear();
+        NavigationManager.NavigateTo($"/movies/{MovieId}");
+    }
+}
